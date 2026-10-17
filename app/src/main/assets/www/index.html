@@ -266,6 +266,13 @@ button{cursor:pointer}
 .xbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-height:160px;overflow:hidden}
 .xbox iframe{width:100%!important}
 .xbox a.twitter-timeline{display:block;padding:16px;color:var(--muted);font-size:15px;text-decoration:none}
+.xcards{display:flex;flex-direction:column;gap:8px}
+.xcards button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 14px}
+.xcards button>span:nth-child(2){flex:1;min-width:0}
+.xcards b{display:block;font-size:16px}
+.xcards small{display:block;font-size:13px;color:var(--muted)}
+.xcards em{font-style:normal;font-weight:700;font-size:14px;color:var(--accent)}
+#xrow .chipbtn{color:var(--ink)}
 .xhelp{display:flex;flex-direction:column;gap:10px}
 .xhelp .chipbtn{color:var(--ink)}
 .channels{display:flex;flex-direction:column;gap:10px}
@@ -351,17 +358,14 @@ body.has-trip .obody{padding-bottom:96px!important}
 
   <!-- NOVEDADES -->
   <section id="view-nov" class="view" hidden>
-    <div class="sec-h"><h2>Publicaciones en X</h2><button type="button" class="refresh" id="xreload" aria-label="Recargar publicaciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></div>
-    <div class="chips" id="xacc">
-      <button data-acc="TransMilenio" class="on">@TransMilenio</button>
-      <button data-acc="BogotaTransito">@BogotaTransito</button>
-      <button data-acc="SectorMovilidad">@SectorMovilidad</button>
+    <div class="sec-h"><h2>Publicaciones en X</h2></div>
+    <p class="fine" id="xstate">Lo último que publican sobre cierres, desvíos y manifestaciones. Se abre dentro de Transub.</p>
+    <div class="xcards" id="xcards">
+      <button type="button" data-acc="TransMilenio"><span class="xs-ic">X</span><span><b>@TransMilenio</b><small>Operación, cierres de estaciones y desvíos</small></span><em>Ver</em></button>
+      <button type="button" data-acc="BogotaTransito"><span class="xs-ic">X</span><span><b>@BogotaTransito</b><small>Estado de las vías, siniestros y bloqueos</small></span><em>Ver</em></button>
+      <button type="button" data-acc="SectorMovilidad"><span class="xs-ic">X</span><span><b>@SectorMovilidad</b><small>Secretaría de Movilidad de Bogotá</small></span><em>Ver</em></button>
     </div>
-    <div class="xbox" id="xbox"><div class="hint">Cargando publicaciones…</div></div>
-    <div class="xhelp">
-      <p class="fine">X solo muestra publicaciones a quien tiene sesión iniciada. Si arriba no ves nada, inicia sesión una vez.</p>
-      <div class="row"><button type="button" class="chipbtn" id="xlogin-go">Iniciar sesión en X</button><button type="button" class="chipbtn" id="xapp">Abrir en la app de X</button></div>
-    </div>
+    <div class="row" id="xrow"><button type="button" class="chipbtn" id="xlogin-go">Iniciar sesión en X</button><button type="button" class="chipbtn" id="xapp">Abrir en la app de X</button></div>
 
     <div class="sec-h"><h2>Canales oficiales</h2></div>
     <p class="fine">TransMilenio también publica cierres, desvíos y cambios de ruta en estos canales. Toca uno para abrirlo.</p>

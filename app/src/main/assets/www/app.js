@@ -305,12 +305,14 @@
 
   const money = v => v ? "$" + v.toLocaleString("es-CO") : "Gratis";
   P.money = money;
-  function personal() { return store.get("personal", true); }
+  // Los transbordos gratis con TuLlave personalizada a veces fallan, así que no se cuentan:
+  // cada vez que se valida la tarjeta se cobra un pasaje completo.
+  function personal() { return false; }
   // Qué se paga al subir a este bus
   function payText(l, r) {
     const F = money(Router.Network.FARE);
     if (l.pay === "full") return r.k === "A" ? ` · <b>pagas ${F}</b> al entrar al portal` : ` · <b>pagas ${F}</b>`;
-    if (l.pay === "free") return " · transbordo sin costo con tu TuLlave personalizada";
+    if (l.pay === "free") return ` · <b>pagas ${F}</b>`;
     if (l.pay === "inside") return " · sin pagar otra vez: sigues dentro de la estación";
     if (l.pay === "alim") return " · alimentador sin costo";
     return "";
@@ -361,7 +363,7 @@
     }
     const fastest = Math.min(...options.map(o => o.total)), cheapest = Math.min(...options.map(o => o.cost || 0));
     const hint = document.createElement("p"); hint.className = "hintline";
-    hint.textContent = (planWhen ? "Saliendo " + whenText(planWhen).toLowerCase() + ". " : "Rutas en servicio ahora. ") + (selected < 0 ? "Toca una opción para ver el paso a paso." : "");
+    hint.textContent = (planWhen ? "Saliendo " + whenText(planWhen).toLowerCase() : "Rutas en servicio ahora") + " · cada vez que validas la tarjeta cuenta como un pasaje de " + money(Router.Network.FARE) + "." + (selected < 0 ? " Toca una opción para ver el paso a paso." : "");
     box.appendChild(hint);
     options.forEach((op, idx) => {
       const rides = op.legs.filter(l => l.kind === "ride");
@@ -419,19 +421,6 @@
     setTimeout(() => { pmap.invalidateSize(); pmap.fitBounds(L.latLngBounds(all).pad(0.12)); }, 60);
   }
   onGps(pos => { if (pos && pme) pme.setLatLng([pos.lat, pos.lng]); });
-
-  // ---------- Forma de pago ----------
-  function renderPay() {
-    const on = personal();
-    document.querySelectorAll("#payrow button").forEach(b => b.classList.toggle("on", (b.dataset.pay === "1") === on));
-    $("payhint").textContent = on ? "Transbordos sin costo durante 125 minutos (hasta 2)." : "Pagas el pasaje completo cada vez que validas.";
-  }
-  $("payrow").addEventListener("click", e => {
-    const b = e.target.closest("button"); if (!b) return;
-    store.set("personal", b.dataset.pay === "1"); renderPay();
-    if (origin && dest && options.length) run();
-  });
-  renderPay();
 
   // ---------- Programar viaje ----------
   const WD = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];

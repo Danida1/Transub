@@ -7,7 +7,8 @@
   const XFER_RADIUS = 500;   // m para cambiar de paradero a pie
   const ACCESS_RADIUS = 1000;
   const MAX_RIDES = 4;
-  const XFER_PENALTY = 300;  // s extra por cada transbordo (incomodidad)
+  const XFER_PENALTY = 300;
+  const WALK_WEIGHT = 1.8;  // s extra por cada transbordo (incomodidad)
   const INF = 1e12;
   // Tarifa 2026 (Decreto Distrital, vigente desde el 14 de enero de 2026): igual para troncal, zonal y TransMiCable
   const FARE = 3550;
@@ -151,6 +152,8 @@
   Network.prototype.raptor = function (o, d, banned, farePen) {
     farePen = farePen || 0;
     const N = this.N, walkT = m => m * DETOUR / WALK, T0 = this.t0;
+    // Caminar más de 400 m pesa más que ir en bus: así se prefiere un alimentador a una caminata larga
+    const walkW = m => walkT(Math.min(m, 400)) + walkT(Math.max(0, m - 400)) * WALK_WEIGHT;
     let access = this.near(o.lat, o.lng, ACCESS_RADIUS);
     if (access.length < 3) access = this.near(o.lat, o.lng, ACCESS_RADIUS * 2);
     let egress = this.near(d.lat, d.lng, ACCESS_RADIUS);
@@ -161,7 +164,7 @@
     const rounds = [];
     const any0 = new Float64Array(N).fill(INF);
     let marked = [];
-    for (const [s, m] of access) { any0[s] = walkT(m); best[s] = any0[s]; marked.push(s); }
+    for (const [s, m] of access) { any0[s] = walkW(m); best[s] = any0[s]; marked.push(s); }
     rounds.push({ any: any0, accessDist: new Map(access) });
 
     const results = [];
@@ -212,7 +215,7 @@
       let bt = INF, bs = -1;
       for (const [s, m] of egMap) {
         if (ride[s] >= INF) continue;
-        const t = ride[s] + walkT(m);
+        const t = ride[s] + walkW(m);
         if (t < bt) { bt = t; bs = s; }
       }
       if (bs >= 0) results.push({ rides: k, total: bt, end: bs, egress: egMap.get(bs) });
@@ -288,7 +291,8 @@
       if (x.score === undefined) {
         const f = this.fare(x, personal); x.cost = f.cost; x.fares = f.full;
         x.xfers = Math.max(0, f.entries - 1);   // transbordos que implican salir y volver a validar
-        x.score = x.total + f.cost / PESOS_PER_MIN * 60 + Math.max(0, x.rides - 1) * XFER_PENALTY + x.xfers * XFER_PENALTY;
+        const longWalk = x.legs.reduce((s, l) => s + (l.kind === "ride" ? 0 : Math.max(0, (l.meters || 0) - 400) * DETOUR / WALK), 0);
+        x.score = x.total + f.cost / PESOS_PER_MIN * 60 + Math.max(0, x.rides - 1) * XFER_PENALTY + x.xfers * XFER_PENALTY + longWalk * (WALK_WEIGHT - 1);
       }
       return x.score;
     };

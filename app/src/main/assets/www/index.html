@@ -253,35 +253,16 @@ button{cursor:pointer}
 .refresh{width:40px;height:40px;border:1.5px solid var(--line);border-radius:50%;background:var(--surface);display:grid;place-items:center;flex:none}
 .refresh svg{width:19px;height:19px}
 .refresh.spin svg{animation:sp .9s linear infinite}
-.nlist{display:flex;flex-direction:column;gap:8px}
-.news{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:13px 14px;color:inherit;font:inherit}
-.news:active{background:var(--sunk)}
-.news .ntop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
-.news b{font-size:16px;line-height:1.35;font-weight:600;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.news .src{font-size:13px;color:var(--muted)}
-.ntag{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 8px}
-.ntag.manif{background:color-mix(in srgb,var(--dest) 18%,transparent);color:var(--dest)}
-.ntag.cierre{background:color-mix(in srgb,#E3A21A 22%,transparent);color:#9A6A00}
-.ntag.oficial{background:color-mix(in srgb,var(--brand) 20%,transparent);color:var(--accent)}
-.ntag.otro{background:var(--sunk);color:var(--muted)}
-.new-dot{width:8px;height:8px;border-radius:50%;background:var(--dest);display:inline-block}
-.skel{height:86px;border-radius:var(--r);background:linear-gradient(90deg,var(--sunk),var(--surface),var(--sunk));background-size:200% 100%;animation:sk 1.2s linear infinite}
-@keyframes sk{to{background-position:-200% 0}}
-@media (prefers-color-scheme: dark){.ntag.cierre{color:#F2C14E}}
-.xdet{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:4px 14px}
-.xdet summary{list-style:none;display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer}
-.xdet summary::-webkit-details-marker{display:none}
-.xdet summary>span:nth-child(2){flex:1;min-width:0}
-.xdet summary b{display:block;font-size:16px}
-.xdet summary small{display:block;font-size:13px;color:var(--muted)}
-.xdet summary svg{width:20px;height:20px;transition:transform .2s}
-.xdet[open] summary svg{transform:rotate(180deg)}
-.xdet[open]{display:flex;flex-direction:column;gap:12px;padding-bottom:14px}
-.xacc{display:flex;flex-direction:column;gap:8px}
-.xacc button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1.5px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 14px;width:100%}
-.xacc b{font-size:16px}
-.xacc small{font-size:13px;color:var(--muted)}
 .xs-ic{width:40px;height:40px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:17px;flex:none}
+.xlogin{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.xlogin b{font-size:18px}
+.xlogin p{margin:0;color:var(--muted);font-size:14.5px}
+.xlogin .go{width:100%;flex:none}
+.xtip{width:100%;border-top:1px solid var(--line);padding-top:10px}
+.xtip summary{cursor:pointer;font-weight:600;font-size:14.5px;color:var(--accent)}
+.xtip[open]{display:flex;flex-direction:column;gap:10px}
+.xtip .chipbtn{color:var(--ink)}
+#xactions .chipbtn{color:var(--ink)}
 .xbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-height:160px;overflow:hidden}
 .xbox iframe{width:100%!important}
 .xbox a.twitter-timeline{display:block;padding:16px;color:var(--muted);font-size:15px;text-decoration:none}
@@ -360,26 +341,24 @@ button{cursor:pointer}
 
   <!-- NOVEDADES -->
   <section id="view-nov" class="view" hidden>
-    <div class="sec-h"><h2>Ahora en la vía</h2><button type="button" class="refresh" id="nrefresh" aria-label="Actualizar noticias"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></div>
-    <p class="fine" id="nstatus">Noticias de TransMilenio, SITP y movilidad en Bogotá.</p>
-    <div class="chips" id="nfilter">
-      <button data-f="" class="on">Todo</button>
-      <button data-f="cierre">Cierres y desvíos</button>
-      <button data-f="manif">Manifestaciones</button>
-      <button data-f="oficial">Oficial</button>
+    <div class="sec-h"><h2>Publicaciones en X</h2><button type="button" class="refresh" id="xreload" aria-label="Recargar publicaciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></div>
+    <div class="chips" id="xacc">
+      <button data-acc="TransMilenio" class="on">@TransMilenio</button>
+      <button data-acc="BogotaTransito">@BogotaTransito</button>
+      <button data-acc="SectorMovilidad">@SectorMovilidad</button>
     </div>
-    <div class="nlist" id="nlist"></div>
-    <button class="more" id="nmore" hidden>Ver más noticias</button>
-
-    <details class="xdet" id="xdet">
-    <summary><span class="xs-ic">X</span><span><b>Publicaciones en X</b><small>Se abren dentro de Transub con tu sesión de Chrome</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></summary>
-    <div class="xacc" id="xacc">
-      <button type="button" data-acc="TransMilenio"><b>@TransMilenio</b><small>Operación, cierres de estaciones y desvíos</small></button>
-      <button type="button" data-acc="BogotaTransito"><b>@BogotaTransito</b><small>Estado de las vías, siniestros y bloqueos</small></button>
-      <button type="button" data-acc="SectorMovilidad"><b>@SectorMovilidad</b><small>Secretaría de Movilidad de Bogotá</small></button>
+    <div class="xlogin" id="xlogin" hidden>
+      <div class="xs-ic">X</div>
+      <b>Inicia sesión en X una sola vez</b>
+      <p>X solo muestra publicaciones a quien tiene sesión. Entras con tu correo o usuario y tu contraseña de X, dentro de Transub, y la app la recuerda.</p>
+      <button type="button" class="go" id="xlogin-go">Iniciar sesión en X</button>
+      <details class="xtip"><summary>Creé mi cuenta de X con Google</summary>
+        <p>Google no deja iniciar sesión con "Continuar con Google" dentro de otras apps. Crea una contraseña para tu cuenta de X (te llega un código a tu correo) y luego entra con tu correo y esa contraseña.</p>
+        <button type="button" class="chipbtn" id="xpass">Crear contraseña de X</button>
+      </details>
     </div>
-    <p class="fine">Si X te pide iniciar sesión, puedes usar "Continuar con Google". La sesión queda guardada en Chrome.</p>
-    </details>
+    <div class="xbox" id="xbox" hidden></div>
+    <div class="row" id="xactions" hidden><button type="button" class="chipbtn" id="xopen">Ver el perfil completo</button><button type="button" class="chipbtn" id="xout">Cerrar sesión de X</button></div>
 
     <div class="sec-h"><h2>Canales oficiales</h2></div>
     <p class="fine">TransMilenio también publica cierres, desvíos y cambios de ruta en estos canales. Toca uno para abrirlo.</p>

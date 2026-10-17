@@ -94,9 +94,30 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> openInTab(Uri.parse(url)));
             }
 
+            // X dentro de la app (visor interno con la sesión guardada)
             @JavascriptInterface
             public void openX(String url) {
-                runOnUiThread(() -> openInTab(Uri.parse(url)));
+                openX(url, "");
+            }
+
+            @JavascriptInterface
+            public void openX(String url, String mode) {
+                runOnUiThread(() -> {
+                    Intent i = new Intent(MainActivity.this, WebPageActivity.class);
+                    i.putExtra("url", url);
+                    i.putExtra("mode", mode);
+                    startActivity(i);
+                });
+            }
+
+            @JavascriptInterface
+            public boolean xLoggedIn() {
+                return WebPageActivity.xLoggedIn();
+            }
+
+            @JavascriptInterface
+            public void xLogout() {
+                WebPageActivity.xLogout();
             }
 
             // Lugar compartido desde otra app (Google Maps): la página lo pide al estar lista
@@ -214,9 +235,11 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if (HOST.equals(uri.getHost()) || !request.isForMainFrame()) return false;
-                // X se ve en una pestaña de Chrome dentro de la app
+                // X se ve dentro de la app
                 if (WebPageActivity.isX(uri)) {
-                    openInTab(uri);
+                    Intent i = new Intent(MainActivity.this, WebPageActivity.class);
+                    i.putExtra("url", uri.toString());
+                    startActivity(i);
                     return true;
                 }
                 // WhatsApp: primero la app normal, luego WhatsApp Business, luego el navegador
@@ -267,6 +290,13 @@ public class MainActivity extends Activity {
             text = intent.getData().toString();
         }
         if (text != null && !text.trim().isEmpty()) pendingShared = text;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Al volver del inicio de sesión de X, Novedades muestra las publicaciones
+        if (web != null) web.evaluateJavascript("window.__xLoginDone&&window.__xLoginDone()", null);
     }
 
     @Override

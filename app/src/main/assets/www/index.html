@@ -256,7 +256,7 @@ button{cursor:pointer}
 .nlist{display:flex;flex-direction:column;gap:8px}
 .news{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:13px 14px;color:inherit;font:inherit}
 .news:active{background:var(--sunk)}
-.news .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.news .ntop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
 .news b{font-size:16px;line-height:1.35;font-weight:600;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .news .src{font-size:13px;color:var(--muted)}
 .ntag{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 8px}
@@ -277,6 +277,10 @@ button{cursor:pointer}
 .xdet summary svg{width:20px;height:20px;transition:transform .2s}
 .xdet[open] summary svg{transform:rotate(180deg)}
 .xdet[open]{display:flex;flex-direction:column;gap:12px;padding-bottom:14px}
+.xacc{display:flex;flex-direction:column;gap:8px}
+.xacc button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1.5px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 14px;width:100%}
+.xacc b{font-size:16px}
+.xacc small{font-size:13px;color:var(--muted)}
 .xs-ic{width:40px;height:40px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:17px;flex:none}
 .xbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-height:160px;overflow:hidden}
 .xbox iframe{width:100%!important}
@@ -368,17 +372,13 @@ button{cursor:pointer}
     <button class="more" id="nmore" hidden>Ver más noticias</button>
 
     <details class="xdet" id="xdet">
-    <summary><span class="xs-ic">X</span><span><b>Publicaciones en X</b><small>@TransMilenio, @BogotaTransito y Movilidad · requiere sesión</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></summary>
-    <div class="chips" id="xacc">
-      <button data-acc="TransMilenio" class="on">@TransMilenio</button>
-      <button data-acc="BogotaTransito">@BogotaTransito</button>
-      <button data-acc="SectorMovilidad">@SectorMovilidad</button>
+    <summary><span class="xs-ic">X</span><span><b>Publicaciones en X</b><small>Se abren dentro de Transub con tu sesión de Chrome</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="xacc" id="xacc">
+      <button type="button" data-acc="TransMilenio"><b>@TransMilenio</b><small>Operación, cierres de estaciones y desvíos</small></button>
+      <button type="button" data-acc="BogotaTransito"><b>@BogotaTransito</b><small>Estado de las vías, siniestros y bloqueos</small></button>
+      <button type="button" data-acc="SectorMovilidad"><b>@SectorMovilidad</b><small>Secretaría de Movilidad de Bogotá</small></button>
     </div>
-    <div class="xbox" id="xbox"><div class="hint">Cargando publicaciones…</div></div>
-    <div class="xhelp">
-      <p class="fine">X solo muestra publicaciones a quien tiene sesión iniciada. Si arriba no ves nada, inicia sesión una vez: la app la recuerda.</p>
-      <div class="row"><button type="button" class="chipbtn" id="xlogin">Iniciar sesión en X</button><button type="button" class="chipbtn" id="xopen">Abrir el perfil completo</button></div>
-    </div>
+    <p class="fine">Si X te pide iniciar sesión, puedes usar "Continuar con Google". La sesión queda guardada en Chrome.</p>
     </details>
 
     <div class="sec-h"><h2>Canales oficiales</h2></div>
@@ -387,16 +387,6 @@ button{cursor:pointer}
       <a class="chan" href="https://whatsapp.com/channel/0029VaRe8rACRs1htLOKee21">
         <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 2.5 4.2 4.5 4.5l1-1 1.8.9"/></svg></div>
         <div><b>Canal de TransMilenio en WhatsApp</b><small>Cierres de estaciones, cambios de rutas y horarios</small></div>
-        <span class="open">Abrir</span>
-      </a>
-      <a class="chan" href="https://x.com/TransMilenio">
-        <div class="ic" aria-hidden="true">X</div>
-        <div><b>@TransMilenio en X</b><small>Reportes al momento: manifestaciones, bloqueos, desvíos</small></div>
-        <span class="open">Abrir</span>
-      </a>
-      <a class="chan" href="https://x.com/BogotaTransito">
-        <div class="ic" aria-hidden="true">X</div>
-        <div><b>@BogotaTransito en X</b><small>Estado de las vías, siniestros y cierres viales</small></div>
         <span class="open">Abrir</span>
       </a>
       <a class="chan" href="https://www.facebook.com/TransMilenio">

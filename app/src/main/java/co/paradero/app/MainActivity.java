@@ -24,6 +24,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
+import androidx.browser.customtabs.CustomTabColorSchemeParams;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.webkit.WebViewAssetLoader;
 
 import org.json.JSONObject;
@@ -85,14 +87,16 @@ public class MainActivity extends Activity {
                 });
             }
 
-            // Abre X dentro de la app (visor con sesión guardada)
+            // Abre una página (X, noticias) en una pestaña de Chrome dentro de la app.
+            // Usa la sesión de Chrome, así que "Continuar con Google" funciona.
+            @JavascriptInterface
+            public void openTab(String url) {
+                runOnUiThread(() -> openInTab(Uri.parse(url)));
+            }
+
             @JavascriptInterface
             public void openX(String url) {
-                runOnUiThread(() -> {
-                    Intent i = new Intent(MainActivity.this, WebPageActivity.class);
-                    i.putExtra("url", url);
-                    startActivity(i);
-                });
+                runOnUiThread(() -> openInTab(Uri.parse(url)));
             }
 
             // Lugar compartido desde otra app (Google Maps): la página lo pide al estar lista
@@ -167,7 +171,7 @@ public class MainActivity extends Activity {
                         Uri u = Uri.parse(url);
                         String h = u.getHost();
                         if (!"https".equals(u.getScheme()) || h == null
-                                || !(h.equals("routing.openstreetmap.de") || h.equals("photon.komoot.io") || h.equals("nominatim.openstreetmap.org"))) {
+                                || !(h.equals("routing.openstreetmap.de") || h.equals("photon.komoot.io") || h.equals("nominatim.openstreetmap.org") || h.equals("news.google.com"))) {
                             throw new Exception("servidor no permitido");
                         }
                         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
@@ -210,11 +214,9 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if (HOST.equals(uri.getHost()) || !request.isForMainFrame()) return false;
-                // Las publicaciones de X se ven dentro de la app
+                // X se ve en una pestaña de Chrome dentro de la app
                 if (WebPageActivity.isX(uri)) {
-                    Intent i = new Intent(MainActivity.this, WebPageActivity.class);
-                    i.putExtra("url", uri.toString());
-                    startActivity(i);
+                    openInTab(uri);
                     return true;
                 }
                 // WhatsApp: primero la app normal, luego WhatsApp Business, luego el navegador
@@ -274,6 +276,26 @@ public class MainActivity extends Activity {
         readShared(intent);
         if (pendingShared != null && web != null)
             web.evaluateJavascript("window.__sharedPing&&window.__sharedPing()", null);
+    }
+
+    private void openInTab(Uri uri) {
+        if (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme())) return;
+        try {
+            CustomTabColorSchemeParams colors = new CustomTabColorSchemeParams.Builder()
+                    .setToolbarColor(0xFF2B7F77).build();
+            CustomTabsIntent tab = new CustomTabsIntent.Builder()
+                    .setDefaultColorSchemeParams(colors)
+                    .setShowTitle(true)
+                    .setShareState(CustomTabsIntent.SHARE_STATE_ON)
+                    .build();
+            tab.launchUrl(this, uri);
+        } catch (ActivityNotFoundException e) {
+            // Sin Chrome ni otro navegador compatible: visor interno
+            Intent i = new Intent(this, WebPageActivity.class);
+            i.putExtra("url", uri.toString());
+            i.putExtra("any", true);
+            startActivity(i);
+        }
     }
 
     private boolean hasLocation() {

@@ -23,6 +23,7 @@ import android.widget.FrameLayout;
  */
 public class WebPageActivity extends Activity {
     private WebView web;
+    private boolean any;
 
     static boolean isX(Uri u) {
         String h = u.getHost();
@@ -62,7 +63,7 @@ public class WebPageActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                if (!request.isForMainFrame() || isX(u)) return false;
+                if (!request.isForMainFrame() || isX(u) || (any && "https".equals(u.getScheme()))) return false;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, u));
                 } catch (ActivityNotFoundException ignored) { }
@@ -75,8 +76,9 @@ public class WebPageActivity extends Activity {
             }
         });
 
+        any = getIntent().getBooleanExtra("any", false);
         String url = getIntent().getStringExtra("url");
-        if (url == null || !isX(Uri.parse(url))) url = "https://x.com/TransMilenio";
+        if (url == null || (!any && !isX(Uri.parse(url)))) url = "https://x.com/TransMilenio";
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(url);
     }

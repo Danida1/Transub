@@ -1,0 +1,19 @@
+name: Copia del GTFS (desarrollo)
+on:
+  workflow_dispatch:
+  push:
+    paths: [".github/workflows/gtfs-copia.yml"]
+permissions:
+  contents: write
+jobs:
+  copia:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar GTFS oficial
+        run: curl -sSfL -o gtfs-bogota.zip https://storage.googleapis.com/gtfs-estaticos/GTFS-2026-04-29.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: datos-gtfs
+          name: Copia del GTFS oficial (para pruebas)
+          prerelease: true
+          files: gtfs-bogota.zip

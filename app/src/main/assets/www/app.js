@@ -495,10 +495,21 @@
     const base = planWhen || new Date();
     $("otitle").textContent = `${origin.name} → ${dest.name}`;
     $("osum").innerHTML = summaryHtml(op, base, detailTag);
+    if (P.ostartLabel) P.ostartLabel();
     $("osteps").innerHTML = stepsFor(op).map(s => `<li>${s.b}<div class="t">${s.t}<small>${s.s}</small></div><span class="m">${s.m}</span></li>`).join("");
   }
   $("opage-back").addEventListener("click", () => popLayer());
-  $("ostart").addEventListener("click", () => { const op = options[selected]; if (op) P.startNav(op, origin, dest, planWhen || new Date()); });
+  $("ostart").addEventListener("click", () => {
+    const op = options[selected]; if (!op) return;
+    const t = P.navTrip && P.navTrip();
+    if (t && t.op === op) P.openNav();              // es el viaje en curso: volver al mapa
+    else P.startNav(op, origin, dest, planWhen || new Date());
+  });
+  P.ostartLabel = () => {
+    const t = P.navTrip && P.navTrip(), op = options[selected];
+    const same = t && op && t.op === op;
+    $("ostart").lastChild.textContent = same ? " Volver al viaje" : t ? " Iniciar este viaje" : " Iniciar viaje";
+  };
 
   // Vista previa del recorrido con tu posición
   let pmap = null, player = null, pme = null;

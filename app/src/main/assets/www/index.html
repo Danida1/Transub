@@ -280,6 +280,16 @@ button{cursor:pointer}
 .info dt{color:var(--muted)}
 .info dd{margin:0;min-width:0;overflow-wrap:anywhere}
 
+.tripbar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:1600;max-width:560px;margin:0 auto;display:flex;align-items:center;gap:12px;border:0;border-radius:16px;padding:12px 14px;background:var(--accent);color:var(--accent-ink);text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.tripbar .tb-tx{flex:1;min-width:0}
+.tripbar b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tripbar small{display:block;font-size:13px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tripbar em{font-style:normal;font-weight:700;font-size:14px;background:rgba(255,255,255,.2);border-radius:999px;padding:6px 12px}
+.tb-dot{width:10px;height:10px;border-radius:50%;background:currentColor;flex:none;box-shadow:0 0 0 4px rgba(255,255,255,.25)}
+@media (prefers-reduced-motion:no-preference){.tb-dot{animation:pulse2 1.6s ease-in-out infinite}}
+@keyframes pulse2{50%{opacity:.35}}
+body.has-trip .app{padding-bottom:170px}
+body.has-trip .obody{padding-bottom:96px!important}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:1100;background:var(--surface);border-top:1px solid var(--line);
   padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;justify-content:center}
 .tabs div{display:flex;gap:6px;max-width:560px;width:100%}
@@ -442,7 +452,7 @@ button{cursor:pointer}
   <div class="nav-top">
     <div class="instr" id="instr"><div><b>Preparando el viaje…</b></div></div>
     <button class="iconbtn" id="nav-voice" aria-label="Silenciar avisos de voz"></button>
-    <button class="iconbtn" id="nav-close" aria-label="Terminar viaje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="iconbtn" id="nav-close" aria-label="Salir del mapa (el viaje sigue)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
   </div>
   <div class="nav-bottom">
     <button class="recenter" id="recenter" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Seguirme</button>
@@ -450,6 +460,8 @@ button{cursor:pointer}
     <div class="eta"><div><span class="big" id="eta-dur"></span><small id="eta-time"></small></div><button class="stop" id="nav-end">Terminar</button></div>
   </div>
 </div>
+
+<button class="tripbar" id="tripbar" hidden><span class="tb-dot" aria-hidden="true"></span><span class="tb-tx"><b id="tb-title">Viaje en curso</b><small id="tb-sub">Toca para ver el mapa</small></span><em>Ver</em></button>
 
 <nav class="tabs" aria-label="Secciones">
   <div role="tablist">

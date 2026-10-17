@@ -93,25 +93,24 @@
     else if (fit) { map.fitBounds(L.latLngBounds(all).pad(0.15)); render(null); }
   }
 
+  // Inicia un viaje nuevo (si había otro, lo reemplaza) y abre el mapa
   P.startNav = function (op, origin, dest, base) {
-    trip = { op, origin, dest, base, cur: 0, arrived: false, legs: legsOf(op) };
+    if (trip) endTrip(true);
+    beginTrip(op, origin, dest, base, true);
+    save();
+    openNav();
+  };
+
+  function beginTrip(op, origin, dest, base, startService) {
+    trip = { op, origin, dest, base, cur: 0, arrived: false, legs: legsOf(op), startedAt: Date.now() };
     spoken = new Set();
-    nativeTrip = false;
-    try { if (window.Android && Android.startTrip) nativeTrip = !!Android.startTrip(JSON.stringify(tripAlerts(op, dest)), voiceOn()); } catch (e) { nativeTrip = false; }
-    $("nav").hidden = false; follow = true; $("recenter").hidden = true;
-    P.pushLayer(stop);
-    keepAwake(true);
-    P.leafletReady(() => {
-      if (!map) {
-        map = P.makeMap($("navmap"));
-        layer = L.layerGroup().addTo(map);
-        map.on("dragstart", () => { if (!ignoreMove) { follow = false; $("recenter").hidden = false; } });
-      }
-      drawTrip(true);
-    });
+    if (startService) {
+      nativeTrip = false;
+      try { if (window.Android && Android.startTrip) nativeTrip = !!Android.startTrip(JSON.stringify(tripAlerts(op, dest)), voiceOn()); } catch (e) { nativeTrip = false; }
+    }
     // Si las caminatas por la calle llegan después, se redibujan
     P.fetchWalks(op).then(got => {
-      if (got && trip && trip.op === op) { const cur = trip.cur; trip.legs = legsOf(op); trip.cur = Math.min(cur, trip.legs.length - 1); drawTrip(false); }
+      if (got && trip && trip.op === op) { const cur = trip.cur; trip.legs = legsOf(op); trip.cur = Math.min(cur, trip.legs.length - 1); drawTrip(false); save(); }
     });
     P.startGps();
     if (off) off();
@@ -120,7 +119,88 @@
       else if (err) msg(err.code === 1 ? "Activa el permiso de ubicación para que el mapa te siga." : "Buscando señal de GPS…");
     });
     render(null);
-  };
+    tripBar();
+  }
+
+  // Abre el mapa del viaje en curso
+  function openNav() {
+    if (!trip) return;
+    $("nav").hidden = false; follow = true; $("recenter").hidden = true;
+    P.pushLayer(minimize);
+    keepAwake(true);
+    tripBar();
+    P.leafletReady(() => {
+      if (!map) {
+        map = P.makeMap($("navmap"));
+        layer = L.layerGroup().addTo(map);
+        map.on("dragstart", () => { if (!ignoreMove) { follow = false; $("recenter").hidden = false; } });
+      }
+      drawTrip(true);
+    });
+  }
+  P.openNav = openNav;
+
+  // Salir del mapa no termina el viaje: queda la barra "Viaje en curso"
+  function minimize() {
+    $("nav").hidden = true; keepAwake(false);
+    tripBar();
+  }
+
+  // Terminar el viaje (botón Terminar, o al iniciar otro)
+  function endTrip(silent) {
+    try { if (window.Android && Android.stopTrip) Android.stopTrip(); } catch (e) {}
+    nativeTrip = false;
+    if (off) { off(); off = null; }
+    trip = null;
+    P.store.set("trip", null);
+    keepAwake(false);
+    if (!$("nav").hidden) { if (silent) $("nav").hidden = true; else P.popLayer(); }
+    tripBar();
+  }
+
+  // Guarda el viaje para recuperarlo si se cierra la app
+  function save() {
+    if (!trip) return;
+    try {
+      P.store.set("trip", { op: { total: trip.op.total, rides: trip.op.rides, cost: trip.op.cost, fares: trip.op.fares, legs: trip.op.legs },
+        origin: trip.origin, dest: trip.dest, base: +trip.base, startedAt: trip.startedAt, net: P.net.generated, native: nativeTrip });
+    } catch (e) {}
+  }
+
+  // Barra "Viaje en curso" sobre las pestañas
+  function tripBar(eta) {
+    const bar = $("tripbar"), on = !!trip && $("nav").hidden;
+    bar.hidden = !on;
+    document.body.classList.toggle("has-trip", on);
+    if (!trip) return;
+    $("tb-title").textContent = "Viaje a " + trip.dest.name;
+    if (eta) $("tb-sub").textContent = eta;
+  }
+  const _tripBar = tripBar;
+  tripBar = function (eta) { _tripBar(eta); if (P.ostartLabel) P.ostartLabel(); };
+  $("tripbar").addEventListener("click", openNav);
+
+  // Al abrir la app: recuperar el viaje que quedó activo
+  function restore() {
+    const t = P.store.get("trip", null);
+    if (!t || trip) return;
+    const native = !!(window.Android && Android.tripRunning);
+    const running = native ? Android.tripRunning() : false;
+    const fresh = Date.now() - (t.startedAt || 0) < 6 * 3600000;
+    if (t.net !== P.net.generated || !fresh || (native && t.native && !running)) { P.store.set("trip", null); return; }
+    nativeTrip = running;
+    t.op.legs.forEach(l => { if (l.walk) l.walkTried = true; });
+    beginTrip(t.op, t.origin, t.dest, new Date(t.base), native && !running);
+    trip.startedAt = t.startedAt;
+    save();
+  }
+  window.addEventListener("network", restore);
+  if (P.net) restore();
+  // Si el viaje se terminó desde la notificación, también se cierra aquí
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !trip || !nativeTrip) return;
+    try { if (window.Android && Android.tripRunning && !Android.tripRunning()) endTrip(false); } catch (e) {}
+  });
 
   P.navTrip = () => trip;
   // Puntos donde sonará cada aviso, en orden, para el servicio en segundo plano
@@ -140,15 +220,8 @@
     return { title: "Viaje a " + dest.name, alerts };
   }
 
-  function stop() {
-    try { if (window.Android && Android.stopTrip) Android.stopTrip(); } catch (e) {}
-    nativeTrip = false;
-    $("nav").hidden = true; keepAwake(false);
-    if (off) { off(); off = null; }
-    trip = null;
-  }
-  $("nav-close").addEventListener("click", () => P.popLayer());
-  $("nav-end").addEventListener("click", () => P.popLayer());
+  $("nav-close").addEventListener("click", () => P.popLayer());     // salir del mapa (el viaje sigue)
+  $("nav-end").addEventListener("click", () => endTrip(false));    // terminar el viaje
   $("recenter").addEventListener("click", () => {
     follow = true; $("recenter").hidden = true;
     if (P.gps.pos && map) { ignoreMove = true; map.setView([P.gps.pos.lat, P.gps.pos.lng], Math.max(map.getZoom(), 17)); setTimeout(() => ignoreMove = false, 400); }
@@ -251,5 +324,6 @@
     const now = pos ? new Date() : trip.base;
     $("eta-dur").textContent = trip.arrived ? "Llegaste" : P.fmtDur(rem);
     $("eta-time").textContent = trip.arrived ? trip.dest.name : "Llegas a las " + P.fmtTime(new Date(now.getTime() + rem * 1000));
+    tripBar(trip.arrived ? "Llegaste a tu destino · toca para terminar" : title + " · llegas a las " + P.fmtTime(new Date(now.getTime() + rem * 1000)));
   }
 })();

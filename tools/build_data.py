@@ -98,6 +98,75 @@ def clean_color(c, default):
     return c.upper() if len(c) == 6 else default
 
 
+def _xy(lat, lon, lat0):
+    return (lon * 111320.0 * math.cos(math.radians(lat0)), lat * 110540.0)
+
+
+def simplify(pts, tol, force=()):
+    """Douglas-Peucker en metros. Devuelve los índices conservados (incluye los de force)."""
+    if len(pts) < 3:
+        return list(range(len(pts)))
+    lat0 = pts[0][0]
+    xy = [_xy(a, b, lat0) for a, b in pts]
+    keep = [False] * len(pts)
+    keep[0] = keep[-1] = True
+    for f in force:
+        keep[f] = True
+    bounds = sorted(set([0, len(pts) - 1] + list(force)))
+    stack = list(zip(bounds, bounds[1:]))
+    while stack:
+        i, j = stack.pop()
+        (x1, y1), (x2, y2) = xy[i], xy[j]
+        dx, dy = x2 - x1, y2 - y1
+        L = math.hypot(dx, dy)
+        best, bi = 0.0, -1
+        for k in range(i + 1, j):
+            x, y = xy[k]
+            d = abs(dy * (x - x1) - dx * (y - y1)) / L if L > 0.5 else math.hypot(x - x1, y - y1)
+            if d > best:
+                best, bi = d, k
+        if best > tol:
+            keep[bi] = True
+            stack += [(i, bi), (bi, j)]
+    return [i for i, k in enumerate(keep) if k]
+
+
+def snap(line, stop_pts):
+    """Índice del punto del trazado más cercano a cada parada, siempre hacia adelante.
+    Devuelve None si el trazado no corresponde a las paradas."""
+    out, start, errs = [], 0, []
+    n = len(line)
+    for la, lo in stop_pts:
+        best, bi = 1e18, start
+        for k in range(start, n):
+            d = hav(la, lo, line[k][0], line[k][1])
+            if d < best:
+                best, bi = d, k
+            elif best < 40 and d > best + 600:
+                break
+        out.append(bi)
+        errs.append(best)
+        start = bi
+    if statistics.median(errs) > 120 or max(errs) > 900:
+        return None
+    return out
+
+
+def encode(pts):
+    """Polilínea codificada (formato de Google, 5 decimales)."""
+    res, pa, po = [], 0, 0
+    for a, b in pts:
+        ia, io = int(round(a * 1e5)), int(round(b * 1e5))
+        for v in (ia - pa, io - po):
+            v = ~(v << 1) if v < 0 else (v << 1)
+            while v >= 0x20:
+                res.append(chr((0x20 | (v & 0x1f)) + 63))
+                v >>= 5
+            res.append(chr(v + 63))
+        pa, po = ia, io
+    return "".join(res)
+
+
 def schedules(p, daytypes):
     """Por tipo de día: [primera salida (min), última salida (min), hora inicial, frecuencia por hora en min...].
     Frecuencia 0 = sin servicio en esa hora. Las horas pueden pasar de 24 (servicio después de medianoche)."""
@@ -201,7 +270,7 @@ def build(data, source):
     trips = {}
     for r in reader(zf, "trips.txt"):
         if r["route_id"] in routes:
-            trips[r["trip_id"]] = (r["route_id"], r.get("direction_id", "") or "", (r.get("trip_headsign") or "").strip(), r.get("service_id", ""))
+            trips[r["trip_id"]] = (r["route_id"], r.get("direction_id", "") or "", (r.get("trip_headsign") or "").strip(), r.get("service_id", ""), r.get("shape_id", "") or "")
     log("Viajes:", len(trips))
 
     # --- Frecuencias declaradas ---
@@ -232,11 +301,13 @@ def build(data, source):
         if len(rows) < 2:
             continue
         rows.sort()
-        rid, d, head, svc = trips[t]
+        rid, d, head, svc, shp = trips[t]
         key = (rid, d, tuple(x[1] for x in rows))
         p = pats.get(key)
         if p is None:
-            p = pats[key] = {"route": rid, "head": head, "seq": key[2], "trips": 0, "deps": [], "samples": [], "freq": []}
+            p = pats[key] = {"route": rid, "head": head, "seq": key[2], "trips": 0, "deps": [], "samples": [], "freq": [], "shapes": defaultdict(int)}
+        if shp:
+            p["shapes"][shp] += 1
         p["trips"] += 1
         dep0 = rows[0][3] if rows[0][3] is not None else rows[0][2]
         if t in freq:
@@ -256,6 +327,27 @@ def build(data, source):
         best_by_dir[(rid, d)] = max(best_by_dir[(rid, d)], p["trips"])
     kept = [(k, p) for k, p in pats.items() if p["trips"] >= max(1, best_by_dir[(k[0], k[1])] * 0.08)]
     log("Patrones conservados:", len(kept))
+
+    # --- Trazados reales por las calles (shapes.txt), simplificados ---
+    need = {}
+    for k, p in kept:
+        if p["shapes"]:
+            need[max(p["shapes"], key=p["shapes"].get)] = None
+    shapes = defaultdict(list)
+    sh = reader(zf, "shapes.txt")
+    if sh and need:
+        for r in sh:
+            sid = r["shape_id"]
+            if sid in need:
+                try:
+                    shapes[sid].append((int(r["shape_pt_sequence"]), float(r["shape_pt_lat"]), float(r["shape_pt_lon"])))
+                except ValueError:
+                    pass
+    dense = {}
+    for sid, pts in shapes.items():
+        pts.sort()
+        dense[sid] = [(a, b) for _, a, b in pts]
+    log("Trazados leídos:", len(dense))
 
     # --- Índices compactos ---
     stop_index, stop_list = {}, []
@@ -300,8 +392,17 @@ def build(data, source):
         if rid not in route_index:
             route_index[rid] = len(route_list)
             route_list.append(rid)
-        out_pats.append({"r": route_index[rid], "h": tidy_h(p["head"]), "w": hw,
-                         "s": [sidx(x) for x in seq], "t": tt, "d": sched})
+        item = {"r": route_index[rid], "h": tidy_h(p["head"]), "w": hw,
+                "s": [sidx(x) for x in seq], "t": tt, "d": sched}
+        if p["shapes"]:
+            line = dense.get(max(p["shapes"], key=p["shapes"].get))
+            idx = snap(line, [(stops[x][1], stops[x][2]) for x in seq]) if line else None
+            if idx:
+                kept_i = simplify(line, 6.0, idx)
+                pos = {v: n for n, v in enumerate(kept_i)}
+                item["g"] = encode([line[i] for i in kept_i])
+                item["gi"] = [pos[i] for i in idx]
+        out_pats.append(item)
 
     # --- Clasificación de rutas ---
     station_like = set()

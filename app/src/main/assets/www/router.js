@@ -254,9 +254,29 @@
     return opts.filter(x => score(x) <= bestScore * 1.35 + 300).slice(0, 4).sort((a, b) => a.total - b.total);
   };
 
+  function decode(str) {
+    const out = []; let i = 0, la = 0, lo = 0;
+    while (i < str.length) {
+      for (let k = 0; k < 2; k++) {
+        let shift = 0, res = 0, c;
+        do { c = str.charCodeAt(i++) - 63; res |= (c & 0x1f) << shift; shift += 5; } while (c >= 0x20);
+        const v = res & 1 ? ~(res >> 1) : res >> 1;
+        if (k === 0) la += v; else lo += v;
+      }
+      out.push([la / 1e5, lo / 1e5]);
+    }
+    return out;
+  }
+  // Trazado real por las calles entre dos paradas del patrón (o rectas entre paradas si no hay trazado)
   Network.prototype.patCoords = function (pi, a, b) {
     const p = this.pats[pi];
-    return p.s.slice(a || 0, b === undefined ? p.s.length : b + 1).map(s => [this.lat[s], this.lng[s]]);
+    a = a || 0; b = b === undefined ? p.s.length - 1 : b;
+    if (p.g && p.gi) {
+      if (!p.line) p.line = decode(p.g);
+      const seg = p.line.slice(p.gi[a], p.gi[b] + 1);
+      if (seg.length >= 2) return seg;
+    }
+    return p.s.slice(a, b + 1).map(s => [this.lat[s], this.lng[s]]);
   };
   Network.prototype.coords = function (leg) {
     if (leg.kind === "ride") return this.patCoords(leg.pat, leg.bpos, leg.apos);

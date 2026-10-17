@@ -53,6 +53,7 @@
   function leafletReady(cb) { if (window.L) cb(); else window.addEventListener("leaflet", cb, { once: true }); }
   function makeMap(el) {
     const map = L.map(el, { zoomControl: false, attributionControl: true }).setView([4.65, -74.08], 12);
+    map.attributionControl.setPrefix(false);   // solo el crédito de OpenStreetMap
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
     return map;
   }

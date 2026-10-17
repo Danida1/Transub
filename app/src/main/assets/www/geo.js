@@ -79,7 +79,7 @@
       rest = rest.slice(m[0].length);
     }
     rest = rest.replace(/^\s*(#|con|y|&|x|-|,)?\s*/, "").replace(/^(calle|cll|cl|carrera|cra|kr|cr|transversal|tv|diagonal|dg)\.?\s*/, "");
-    const m2 = rest.match(/^(\d{1,3})\s*(?:([a-h])(?![a-z]))?\s*(bis)?\s*(?:([a-h])(?![a-z]))?(?:\s*[-\s]\s*(\d{1,3}))?/);
+    const m2 = rest.match(/^(\d{1,3})\s*(?:([a-h])(?![a-z]))?\s*(bis)?\s*(?:([a-h])(?![a-z]))?(?:\s*(?:-|(?<=[a-z\s]))\s*(\d{1,3}))?(?!\d)/);
     if (!m2) return null;
     const plate = m2[5] ? +m2[5] : 0, second = numVal(m2) + plate / 100;
     const sur = /\bsur\b/.test(s), este = /\beste\b/.test(s);
@@ -87,7 +87,7 @@
     if (sur) calle = -calle; if (este) carrera = -carrera;
     const p = GRID(calle, carrera);
     if (!inBogota(p)) return null;
-    const label = `${firstTxt} # ${m2[1]}${m2[2] ? m2[2].toUpperCase() : ""}${m2[5] ? "-" + m2[5] : ""}${sur && !/sur/i.test(firstTxt) ? " Sur" : ""}`;
+    const label = `${firstTxt} # ${numTxt(m2)}${m2[5] ? "-" + m2[5] : ""}${sur && !/sur/i.test(firstTxt) ? " Sur" : ""}`;
     return { name: label, lat: p.lat, lng: p.lng, kind: "Dirección aprox.", approx: true };
   }
 

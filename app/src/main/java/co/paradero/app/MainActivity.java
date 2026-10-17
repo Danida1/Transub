@@ -217,7 +217,17 @@ public class MainActivity extends Activity {
                     startActivity(i);
                     return true;
                 }
-                // Otros enlaces (WhatsApp, Facebook) se abren en su app o en el navegador
+                // WhatsApp: primero la app normal, luego WhatsApp Business, luego el navegador
+                String host = uri.getHost() == null ? "" : uri.getHost();
+                if (host.equals("whatsapp.com") || host.endsWith(".whatsapp.com") || host.equals("wa.me")) {
+                    for (String pkg : new String[]{"com.whatsapp", "com.whatsapp.w4b"}) {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, uri).setPackage(pkg));
+                            return true;
+                        } catch (ActivityNotFoundException ignored) { }
+                    }
+                }
+                // Otros enlaces (Facebook, etc.) se abren en su app o en el navegador
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (ActivityNotFoundException ignored) { }

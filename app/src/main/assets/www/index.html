@@ -250,6 +250,34 @@ button{cursor:pointer}
 .stops li.ends i{border-color:var(--ink);background:var(--ink)}
 .stops li.ends{font-weight:700}
 
+.refresh{width:40px;height:40px;border:1.5px solid var(--line);border-radius:50%;background:var(--surface);display:grid;place-items:center;flex:none}
+.refresh svg{width:19px;height:19px}
+.refresh.spin svg{animation:sp .9s linear infinite}
+.nlist{display:flex;flex-direction:column;gap:8px}
+.news{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:13px 14px;color:inherit;font:inherit}
+.news:active{background:var(--sunk)}
+.news .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.news b{font-size:16px;line-height:1.35;font-weight:600;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.news .src{font-size:13px;color:var(--muted)}
+.ntag{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 8px}
+.ntag.manif{background:color-mix(in srgb,var(--dest) 18%,transparent);color:var(--dest)}
+.ntag.cierre{background:color-mix(in srgb,#E3A21A 22%,transparent);color:#9A6A00}
+.ntag.oficial{background:color-mix(in srgb,var(--brand) 20%,transparent);color:var(--accent)}
+.ntag.otro{background:var(--sunk);color:var(--muted)}
+.new-dot{width:8px;height:8px;border-radius:50%;background:var(--dest);display:inline-block}
+.skel{height:86px;border-radius:var(--r);background:linear-gradient(90deg,var(--sunk),var(--surface),var(--sunk));background-size:200% 100%;animation:sk 1.2s linear infinite}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-color-scheme: dark){.ntag.cierre{color:#F2C14E}}
+.xdet{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:4px 14px}
+.xdet summary{list-style:none;display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer}
+.xdet summary::-webkit-details-marker{display:none}
+.xdet summary>span:nth-child(2){flex:1;min-width:0}
+.xdet summary b{display:block;font-size:16px}
+.xdet summary small{display:block;font-size:13px;color:var(--muted)}
+.xdet summary svg{width:20px;height:20px;transition:transform .2s}
+.xdet[open] summary svg{transform:rotate(180deg)}
+.xdet[open]{display:flex;flex-direction:column;gap:12px;padding-bottom:14px}
+.xs-ic{width:40px;height:40px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:17px;flex:none}
 .xbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-height:160px;overflow:hidden}
 .xbox iframe{width:100%!important}
 .xbox a.twitter-timeline{display:block;padding:16px;color:var(--muted);font-size:15px;text-decoration:none}
@@ -328,7 +356,19 @@ button{cursor:pointer}
 
   <!-- NOVEDADES -->
   <section id="view-nov" class="view" hidden>
-    <div class="sec-h"><h2>Lo último en X</h2></div>
+    <div class="sec-h"><h2>Ahora en la vía</h2><button type="button" class="refresh" id="nrefresh" aria-label="Actualizar noticias"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></div>
+    <p class="fine" id="nstatus">Noticias de TransMilenio, SITP y movilidad en Bogotá.</p>
+    <div class="chips" id="nfilter">
+      <button data-f="" class="on">Todo</button>
+      <button data-f="cierre">Cierres y desvíos</button>
+      <button data-f="manif">Manifestaciones</button>
+      <button data-f="oficial">Oficial</button>
+    </div>
+    <div class="nlist" id="nlist"></div>
+    <button class="more" id="nmore" hidden>Ver más noticias</button>
+
+    <details class="xdet" id="xdet">
+    <summary><span class="xs-ic">X</span><span><b>Publicaciones en X</b><small>@TransMilenio, @BogotaTransito y Movilidad · requiere sesión</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="chips" id="xacc">
       <button data-acc="TransMilenio" class="on">@TransMilenio</button>
       <button data-acc="BogotaTransito">@BogotaTransito</button>
@@ -339,6 +379,7 @@ button{cursor:pointer}
       <p class="fine">X solo muestra publicaciones a quien tiene sesión iniciada. Si arriba no ves nada, inicia sesión una vez: la app la recuerda.</p>
       <div class="row"><button type="button" class="chipbtn" id="xlogin">Iniciar sesión en X</button><button type="button" class="chipbtn" id="xopen">Abrir el perfil completo</button></div>
     </div>
+    </details>
 
     <div class="sec-h"><h2>Canales oficiales</h2></div>
     <p class="fine">TransMilenio también publica cierres, desvíos y cambios de ruta en estos canales. Toca uno para abrirlo.</p>

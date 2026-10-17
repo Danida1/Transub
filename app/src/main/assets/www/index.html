@@ -72,6 +72,11 @@ button{cursor:pointer}
 .pay{display:flex;flex-direction:column;gap:6px}
 .pay>span{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .pay small{font-size:13px;color:var(--muted)}
+.seg3{display:grid;grid-template-columns:.8fr 1.4fr 1fr;background:var(--sunk);border-radius:12px;padding:4px;gap:4px;margin-top:10px}
+.seg3 button{display:flex;align-items:center;justify-content:center;gap:7px;border:0;background:transparent;border-radius:9px;padding:10px 4px;font-size:14.5px;font-weight:600;color:var(--muted)}
+.seg3 button i{width:9px;height:9px;border-radius:50%;flex:none;opacity:.55}
+.seg3 button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.seg3 button.on i{opacity:1}
 .seg2{display:grid;grid-template-columns:1fr 1fr;background:var(--sunk);border-radius:12px;padding:4px;gap:4px}
 .seg2 button{border:0;background:transparent;border-radius:9px;padding:9px 6px;font-size:14px;font-weight:600;color:var(--muted)}
 .seg2 button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
@@ -351,6 +356,11 @@ body.has-trip .obody{padding-bottom:96px!important}
         <button type="button" class="pick" id="pick-to"><small>Hacia</small><span class="ph">¿A dónde vas?</span></button>
       </div>
       <button type="button" class="when" id="when"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b id="when-text">Salir ahora</b><small id="when-day"></small></span><em>Cambiar</em></button>
+      <div class="seg3" id="mode" role="radiogroup" aria-label="Qué transporte usar">
+        <button type="button" data-mode="all" class="on" role="radio" aria-checked="true">Todo</button>
+        <button type="button" data-mode="tm" role="radio" aria-checked="false"><i style="background:#C8102E"></i>TransMilenio</button>
+        <button type="button" data-mode="sitp" role="radio" aria-checked="false"><i style="background:#0072BC"></i>SITP</button>
+      </div>
       <div class="row">
         <button type="submit" class="go" id="go" disabled>Cargando rutas…</button>
       </div>

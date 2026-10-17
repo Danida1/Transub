@@ -394,10 +394,24 @@
     $("results").innerHTML = '<div class="loading"><div class="spin"></div>Calculando rutas en servicio…</div>';
     saveRecentTrip(origin, dest);
     setTimeout(() => {
-      options = P.net.plan(origin, dest, planWhen || new Date(), personal()); selected = -1;
+      options = P.net.plan(origin, dest, planWhen || new Date(), personal(), mode); selected = -1;
       renderResults(); drawPreview();
     }, 30);
   }
+
+  // ---------- Filtro: Todo / solo TransMilenio / solo SITP ----------
+  let mode = store.get("mode", "all");
+  const MODE_NAME = { tm: "TransMilenio", sitp: "SITP" };
+  function setMode(m) {
+    mode = MODE_NAME[m] ? m : "all"; store.set("mode", mode);
+    $("mode").querySelectorAll("button").forEach(b => { const on = b.dataset.mode === mode; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
+  }
+  setMode(mode);
+  $("mode").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b || b.dataset.mode === mode) return;
+    setMode(b.dataset.mode);
+    if (origin && dest && !$("opth").hidden) run();
+  });
 
   // ---------- Viajes recientes (máximo 3) ----------
   const placeKey = p => p.gps ? "gps" : p.name + "@" + p.lat.toFixed(4) + "," + p.lng.toFixed(4);
@@ -544,6 +558,13 @@
       const first = new Date(); if (first.getHours() >= 4) first.setDate(first.getDate() + 1); first.setHours(5, 0, 0, 0);
       const firstLabel = (first.getDate() === new Date().getDate() ? "Hoy" : "Mañana") + " a las 5:00 a. m.";
       const b = document.createElement("div"); b.className = "banner";
+      if (!options.length && mode !== "all") {
+        b.innerHTML = `<b>No hay rutas solo en ${MODE_NAME[mode]} entre estos puntos.</b>
+          <span class="hintline">Prueba combinando TransMilenio y SITP.</span>
+          <div class="row"><button class="chipbtn" data-all>Ver todas las rutas</button></div>`;
+        b.querySelector("[data-all]").addEventListener("click", () => { setMode("all"); run(); });
+        box.appendChild(b); return;
+      }
       b.innerHTML = `<b>${options.length ? "A esta hora casi no hay buses." : "A esta hora no hay rutas en servicio entre estos puntos."}</b>
         <span class="hintline">Programa tu viaje para ver la mejor ruta cuando vuelvan a operar.</span>
         <div class="row"><button class="chipbtn" data-first>${ICON.clock} ${firstLabel}</button><button class="chipbtn" data-pick>Elegir día y hora</button></div>`;

@@ -154,10 +154,17 @@
     const N = this.N, walkT = m => m * DETOUR / WALK, T0 = this.t0;
     // Caminar más de 400 m pesa más que ir en bus: así se prefiere un alimentador a una caminata larga
     const walkW = m => walkT(Math.min(m, 400)) + walkT(Math.max(0, m - 400)) * WALK_WEIGHT;
-    let access = this.near(o.lat, o.lng, ACCESS_RADIUS);
-    if (access.length < 3) access = this.near(o.lat, o.lng, ACCESS_RADIUS * 2);
-    let egress = this.near(d.lat, d.lng, ACCESS_RADIUS);
-    if (egress.length < 3) egress = this.near(d.lat, d.lng, ACCESS_RADIUS * 2);
+    // Con el filtro (solo TransMilenio o solo SITP) únicamente sirven los paraderos de ese sistema,
+    // y se permite caminar más para llegar a uno (por ejemplo, a la estación más cercana)
+    const fb = this._filter, sp = this.stopPats, pats = this.pats;
+    const usable = s => { if (!fb) return true; const a = sp[s]; for (let i = 0; i < a.length; i += 2) if (!fb.has(pats[a[i]].r)) return true; return false; };
+    const reach = (p) => {
+      let r = this.near(p.lat, p.lng, ACCESS_RADIUS).filter(([s]) => usable(s));
+      if (r.length < 3) r = this.near(p.lat, p.lng, ACCESS_RADIUS * 2).filter(([s]) => usable(s));
+      if (fb && r.length < 2) r = this.near(p.lat, p.lng, ACCESS_RADIUS * 3.5).filter(([s]) => usable(s));
+      return r;
+    };
+    const access = reach(o), egress = reach(d);
     const egMap = new Map(egress.map(([s, m]) => [s, m]));
 
     const best = new Float64Array(N).fill(INF);
@@ -282,8 +289,17 @@
   Network.FARE = FARE;
 
   // Opciones variadas para la hora indicada (por defecto, ahora)
-  Network.prototype.plan = function (o, d, when, personal) {
+  // mode: "all" (todo), "tm" (TransMilenio: troncales, duales, alimentadores y cable) o "sitp" (buses zonales)
+  Network.prototype.modeBan = function (mode) {
+    if (!mode || mode === "all") return null;
+    const keep = mode === "tm" ? k => k !== "Z" : k => k === "Z", ban = new Set();
+    this.routes.forEach((r, i) => { if (!keep(r.k)) ban.add(i); });
+    return ban;
+  };
+  Network.prototype.plan = function (o, d, when, personal, mode) {
     this.setTime(when || new Date());
+    const base = this.modeBan(mode);
+    this._filter = base;
     personal = personal !== false;
     const opts = [], seen = new Set();
     // Puntaje: tiempo real + dinero convertido a minutos + incomodidad de cada transbordo
@@ -301,10 +317,10 @@
       if (!sig || seen.has(sig)) return;
       seen.add(sig); opts.push(it);
     };
-    this.raptor(o, d, null, personal ? 0 : FARE_SEC).forEach(add);
+    this.raptor(o, d, base, personal ? 0 : FARE_SEC).forEach(add);
     // Variante que evita pagar otro pasaje: privilegia seguir dentro del sistema troncal
-    this.raptor(o, d, null, FARE_SEC).forEach(add);
-    const banned = new Set();
+    this.raptor(o, d, base, FARE_SEC).forEach(add);
+    const banned = new Set(base || []);
     for (let attempt = 0; attempt < 2 && opts.length; attempt++) {
       const main = opts.slice().sort((a, b) => score(a) - score(b))[0];
       const longest = main.legs.filter(l => l.kind === "ride").sort((a, b) => b.sec - a.sec)[0];

@@ -1,0 +1,57 @@
+name: Construir APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+  schedule:
+    # El día 1 de cada mes vuelve a descargar el GTFS oficial y publica una APK actualizada
+    - cron: "0 11 1 * *"
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Descargar el GTFS oficial (SIMUR) y preparar los datos
+        run: python tools/build_data.py
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compilar
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk out/Paradero.apk
+
+      - name: Guardar la APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paradero-apk
+          path: out/Paradero.apk
+
+      - name: Publicar en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Paradero 1.0.${{ github.run_number }}
+          body: |
+            APK lista para instalar en Android 8 o superior.
+            Descarga Paradero.apk desde el teléfono y ábrela para instalarla.
+            Rutas y paraderos: GTFS oficial de Bogotá (SIMUR), descargado al compilar esta versión.
+          files: out/Paradero.apk

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Paradero</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#EEF0EE; --surface:#FFFFFF; --sunk:#E3E6E4; --ink:#16191A; --muted:#5D6563; --line:#D2D7D4;
+  --accent:#B3122B; --accent-ink:#FFFFFF; --warn:#B7700C; --warn-bg:#FCEFD9; --walk:#8A918F;
+  --f-display:"Archivo Narrow","Arial Narrow",Arial,sans-serif;
+  --f-body:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"Roboto Mono",monospace;
+  --r:14px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#111415; --surface:#1A1E1F; --sunk:#232829; --ink:#EDF0EF; --muted:#9AA3A1; --line:#2E3536;
+  --accent:#E8445C; --accent-ink:#1A0006; --warn:#E8A23A; --warn-bg:#2E2412; --walk:#7C8583; color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.app{max-width:560px;margin:0 auto;padding-block:16px 96px;display:flex;flex-direction:column;gap:16px}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.mark{width:34px;height:34px;border-radius:8px;background:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:var(--accent-ink);font-size:20px}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:26px;margin:0;line-height:1}
+.brand small{display:block;color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.clock{font-family:var(--f-num);font-size:13px;color:var(--muted)}
+
+.search{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.fields{display:grid;grid-template-columns:18px 1fr 40px;gap:8px 10px;align-items:center}
+.rail{grid-row:1/3;align-self:stretch;display:flex;flex-direction:column;align-items:center;padding-block:16px}
+.rail i{width:10px;height:10px;border-radius:50%;border:2.5px solid var(--ink);flex:none}
+.rail i.end{background:var(--accent);border-color:var(--accent);border-radius:2px}
+.rail b{flex:1;width:2px;background:repeating-linear-gradient(var(--muted) 0 3px,transparent 3px 6px);margin-block:4px}
+.field{position:relative;min-width:0}
+.field label{position:absolute;left:12px;top:6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+.field input{width:100%;border:1px solid var(--line);background:var(--sunk);border-radius:10px;padding:21px 36px 7px 12px;font-size:16px;outline:none}
+.field input:focus{border-color:var(--ink);background:var(--surface)}
+.clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;border-radius:50%}
+.swap{grid-row:1/3;grid-column:3;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.swap svg{width:18px;height:18px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.gps{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 13px;font-size:14px;font-weight:500}
+.gps svg{width:16px;height:16px}
+.go{flex:1;min-width:150px;border:0;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:11px 18px;font-weight:700;font-size:15px}
+.go:disabled{opacity:.5}
+.note{font-size:13px;color:var(--muted);margin:0}
+.note.err{color:var(--warn)}
+
+.suggest{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:1000;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);max-height:300px;overflow:auto;padding:4px}
+.suggest button{display:flex;width:100%;text-align:left;border:0;background:transparent;padding:9px 10px;border-radius:7px;gap:10px;align-items:center}
+.suggest button:hover,.suggest button.on{background:var(--sunk)}
+.suggest .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.suggest .nm small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.suggest .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-left:auto;flex:none}
+.suggest .hint{padding:9px 10px;font-size:13px;color:var(--muted)}
+
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sec-h h2{font-family:var(--f-display);font-size:19px;margin:0;font-weight:700}
+.sec-h span{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.results{display:flex;flex-direction:column;gap:10px}
+.opt{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;display:flex;flex-direction:column;gap:10px;text-align:left;width:100%}
+.opt.sel{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.opt-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.mins{font-family:var(--f-num);font-weight:600;font-size:26px;line-height:1}
+.mins small{font-size:13px;font-weight:500;margin-left:2px;color:var(--muted)}
+.arr{font-size:13px;color:var(--muted)}
+.tag{margin-left:auto;font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;padding:4px 8px;border-radius:6px;background:var(--ink);color:var(--bg)}
+.strip{display:flex;gap:3px;height:26px}
+.seg{border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:700;font-size:13px;min-width:30px;overflow:hidden;white-space:nowrap;padding-inline:4px}
+.seg.walk{background:repeating-linear-gradient(90deg,var(--walk) 0 4px,transparent 4px 7px);height:4px;align-self:center;min-width:14px;padding:0}
+.meta{display:flex;gap:14px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.meta b{color:var(--ink);font-weight:600}
+.steps{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-direction:column}
+.steps li{display:grid;grid-template-columns:52px 1fr auto;gap:10px;padding:9px 0;border-top:1px solid var(--line);align-items:start}
+.badge{min-width:40px;height:24px;padding-inline:4px;border-radius:5px;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:13px;white-space:nowrap}
+.badge.walk{background:transparent;color:var(--muted);border:1px dashed var(--walk);font-size:9.5px;letter-spacing:.03em;padding-inline:3px}
+.steps .t{font-size:14px;min-width:0}
+.steps .t small{display:block;color:var(--muted);font-size:12.5px}
+.steps .m{font-family:var(--f-num);font-size:13px;color:var(--muted)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:18px;color:var(--muted);font-size:14px}
+
+.mapcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px;overflow:hidden}
+#map{height:320px;border-radius:9px;background:var(--sunk)}
+#map svg{width:100%;height:100%}
+.leaflet-container{font-family:var(--f-body)}
+
+.channels{display:flex;flex-direction:column;gap:10px}
+.chan{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;color:inherit;text-decoration:none}
+.chan .ic{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;background:var(--sunk);font-family:var(--f-display);font-weight:700;font-size:17px}
+.chan .ic svg{width:22px;height:22px}
+.chan b{display:block;font-size:15px}
+.chan small{color:var(--muted);font-size:13px}
+.chan .open{font-size:13px;font-weight:700;color:var(--accent)}
+.fine{font-size:12.5px;color:var(--muted);margin:0}
+.info{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13.5px}
+.info dt{color:var(--muted)}
+.info dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:1100;background:var(--surface);border-top:1px solid var(--line);
+  padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;justify-content:center}
+.tabs div{display:flex;gap:6px;max-width:560px;width:100%}
+.tabs button{flex:1;border:0;background:transparent;border-radius:10px;padding:10px;font-weight:600;font-size:14px;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--sunk);color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">P</div>
+      <div><h1>Paradero</h1><small>TransMilenio y SITP · Bogotá</small></div>
+    </div>
+    <div class="clock" id="clock"></div>
+  </header>
+
+  <section id="view-rutas" style="display:flex;flex-direction:column;gap:16px">
+    <form class="search" id="form" autocomplete="off">
+      <div class="fields">
+        <div class="rail" aria-hidden="true"><i></i><b></b><i class="end"></i></div>
+        <div class="field">
+          <label for="from">Desde</label>
+          <input id="from" placeholder="Dirección, estación o lugar" enterkeyhint="next">
+          <button type="button" class="clear" data-for="from" aria-label="Borrar origen" hidden>×</button>
+          <div class="suggest" id="sug-from" hidden></div>
+        </div>
+        <button type="button" class="swap" id="swap" aria-label="Intercambiar origen y destino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 4 3.5 7.5M7 4l3.5 3.5M17 20V4M17 20l-3.5-3.5M17 20l3.5-3.5"/></svg>
+        </button>
+        <div class="field">
+          <label for="to">Hacia</label>
+          <input id="to" placeholder="Ej: Calle 72 # 10-34" enterkeyhint="search">
+          <button type="button" class="clear" data-for="to" aria-label="Borrar destino" hidden>×</button>
+          <div class="suggest" id="sug-to" hidden></div>
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" class="gps" id="gps">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          Usar mi ubicación
+        </button>
+        <button type="submit" class="go" id="go" disabled>Cargando rutas…</button>
+      </div>
+      <p class="note" id="msg" hidden></p>
+    </form>
+
+    <div class="sec-h"><h2>Opciones</h2><span id="summary"></span></div>
+    <div class="results" id="results">
+      <div class="loading"><div class="spin"></div>Cargando la red de TransMilenio y SITP…</div>
+    </div>
+
+    <div class="mapcard" id="mapcard" hidden><div id="map"></div></div>
+  </section>
+
+  <section id="view-nov" hidden style="flex-direction:column;gap:16px">
+    <div class="sec-h"><h2>Novedades en la vía</h2></div>
+    <p class="fine">TransMilenio publica cierres, desvíos, manifestaciones y cambios de ruta en sus canales oficiales. Toca uno para abrirlo en su aplicación.</p>
+    <div class="channels">
+      <a class="chan" href="https://whatsapp.com/channel/0029VaRe8rACRs1htLOKee21">
+        <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 2.5 4.2 4.5 4.5l1-1 1.8.9"/></svg></div>
+        <div><b>Canal de TransMilenio en WhatsApp</b><small>Cierres de estaciones, cambios de rutas y horarios</small></div>
+        <span class="open">Abrir</span>
+      </a>
+      <a class="chan" href="https://x.com/TransMilenio">
+        <div class="ic" aria-hidden="true">X</div>
+        <div><b>@TransMilenio en X</b><small>Reportes al momento: manifestaciones, bloqueos, desvíos</small></div>
+        <span class="open">Abrir</span>
+      </a>
+      <a class="chan" href="https://x.com/BogotaTransito">
+        <div class="ic" aria-hidden="true">X</div>
+        <div><b>@BogotaTransito en X</b><small>Estado de las vías, siniestros y cierres viales</small></div>
+        <span class="open">Abrir</span>
+      </a>
+      <a class="chan" href="https://www.facebook.com/TransMilenio">
+        <div class="ic" aria-hidden="true">f</div>
+        <div><b>TransMilenio en Facebook</b><small>Comunicados y avisos de la operación</small></div>
+        <span class="open">Abrir</span>
+      </a>
+    </div>
+
+    <div class="sec-h"><h2>Datos de la app</h2></div>
+    <dl class="info" id="datainfo"><dt>Estado</dt><dd>Cargando…</dd></dl>
+    <p class="fine">Rutas, paraderos y frecuencias vienen del GTFS oficial de Bogotá publicado por SIMUR (Secretaría de Movilidad). Los tiempos son estimados con las frecuencias programadas; no incluyen la posición de los buses en vivo.</p>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="Secciones">
+  <div role="tablist">
+    <button role="tab" aria-selected="true" id="tab-rutas">Rutas</button>
+    <button role="tab" aria-selected="false" id="tab-nov">Novedades</button>
+  </div>
+</nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" async onload="window.__leaflet=true;window.dispatchEvent(new Event('leaflet'))"></script>
+<script src="geo.js"></script>
+<script src="router.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

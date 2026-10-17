@@ -1,0 +1,52 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer
+
+android {
+    namespace 'co.paradero.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'co.paradero.app'
+        minSdk 26
+        targetSdk 35
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    // Llave de firma propia del proyecto: permite instalar las nuevas versiones encima de las anteriores.
+    signingConfigs {
+        paradero {
+            storeFile file('paradero.keystore')
+            storePassword 'paradero2026'
+            keyAlias 'paradero'
+            keyPassword 'paradero2026'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.paradero
+        }
+        debug {
+            signingConfig signingConfigs.paradero
+        }
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

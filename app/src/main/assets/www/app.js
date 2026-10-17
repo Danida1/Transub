@@ -21,6 +21,7 @@
     station: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v9h14v-9M9 19v-5h6v5"/></svg>',
     stop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22V3"/><rect x="8" y="3" width="11" height="8" rx="2"/></svg>',
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 21V9l8-6 8 6v12z"/><path d="M10 21v-6h4v6"/></svg>',
+    map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     walker: '<svg viewBox="0 0 24 24" fill="#fff"><circle cx="13" cy="3.6" r="2.2"/><path d="M10.6 7.2l3-.6c.9-.2 1.7.3 2.1 1.1l1.2 2.8 2.4 1.1-.8 1.6-3-1.4-.8-1.7-.9 3.6 2.2 2.5.6 5.6h-1.9l-.5-4.8-2.4-2.3-.9 3.5-3.7 3.9-1.3-1.3 3.2-3.5 1.6-6.5-1.6.7-1 3h-1.9l1.3-4.2z"/></svg>',
     go: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l7 19-7-4-7 4z"/></svg>',
@@ -199,6 +200,7 @@
 
   function rowHtml(p, i) {
     const ic = p.ic || (p.kind === "GPS" ? "gps" : p.approx ? "home" : p.kind === "Lugar" ? "pin" : p.recent ? "clock" : "pin");
+    if (p.kind === "Lugar" && p.dist != null && !p.recent) p = Object.assign({}, p, { sub: (p.sub ? p.sub + " · " : "") + "a " + meters(p.dist) });
     return `<button class="res" data-i="${i}"><span class="ic ${ic === "gps" ? "gps" : ""}">${ICON[ic] || ICON.pin}</span><span class="tx"><b>${esc(p.name)}</b><small>${esc(p.sub || p.kind || "")}</small></span></button>`;
   }
   function renderSheet(online) {
@@ -206,8 +208,10 @@
     $("sq-clear").hidden = !v;
     items = []; let html = "";
     const gpsItem = { name: "Mi ubicación", kind: "GPS", ic: "gps", sub: gps.pos ? "Precisión aprox. " + Math.round(gps.pos.acc) + " m" : "Usar el GPS del teléfono" };
+    const mapItem = { name: "Elegir en el mapa", kind: "MAP", ic: "map", sub: "Mueve el mapa y marca el punto exacto" };
     if (!q) {
       items.push(gpsItem); html += rowHtml(gpsItem, 0);
+      html += rowHtml(mapItem, items.length); items.push(mapItem);
       const recent = store.get("places", []).slice(0, 6);
       if (recent.length) {
         html += '<div class="grp">Recientes</div>';
@@ -226,12 +230,12 @@
     }
     const looksAddr = /^(calle|cl|cll|carrera|cra|kr|ak|ac|av|diag|dg|tv|trans)\b/.test(q);
     if (online && online.length) {
-      const seen = new Set(items.map(i => Geo.norm(i.name)));
-      const fresh = online.filter(o => !seen.has(Geo.norm(o.name)));
-      if (fresh.length) { html += '<div class="grp">Lugares</div>'; fresh.forEach(p => { html += rowHtml(p, items.length); items.push(p); }); }
-    } else if (!looksAddr && q.length >= 3) html += '<div class="hint">Buscando lugares…</div>';
+      const fresh = online.filter(o => !items.some(i => Geo.norm(i.name) === Geo.norm(o.name) && Router.hav(i.lat, i.lng, o.lat, o.lng) < 150));
+      if (fresh.length) { html += `<div class="grp">Lugares${gps.pos ? " · los más cercanos primero" : ""}</div>`; fresh.forEach(p => { html += rowHtml(p, items.length); items.push(p); }); }
+    } else if (!looksAddr && q.length >= 3 && !online) html += '<div class="hint">Buscando lugares…</div>';
     if (!items.length && looksAddr) html += '<div class="hint">Completa la dirección, por ejemplo: Calle 72 # 10-34 o Carrera 7 con Calle 45.</div>';
-    else if (!items.length && online) html += '<div class="hint">Sin resultados. Prueba con una dirección como Calle 72 # 10-34.</div>';
+    else if (online && !online.length) html += '<div class="hint">No encontramos ese lugar en el mapa. Prueba con su dirección (Calle 72 # 10-34) o márcalo en el mapa.</div>';
+    html += '<div class="grp">¿No aparece?</div>' + rowHtml(mapItem, items.length); items.push(mapItem);
     $("sres").innerHTML = html;
   }
   $("sq").addEventListener("input", () => {
@@ -240,7 +244,7 @@
     const v = $("sq").value.trim();
     if (v.length >= 3 && !/^(calle|cl|cll|carrera|cra|kr|ak|ac|av|diag|dg|tv|trans)\b/.test(Geo.norm(v))) {
       const my = ++token;
-      timer = setTimeout(async () => { const on = await Geo.searchOnline(v); if (my === token && !$("sheet").hidden) renderSheet(on); }, 350);
+      timer = setTimeout(async () => { const on = await Geo.searchOnline(v, gps.pos || origin || null); if (my === token && !$("sheet").hidden) renderSheet(on); }, 350);
     }
   });
   $("sq").addEventListener("keydown", e => { if (e.key === "Enter" && items.length) { e.preventDefault(); choose(items.find(i => i.kind !== "GPS") ? items.indexOf(items.find(i => i.kind !== "GPS")) : 0); } });
@@ -249,6 +253,7 @@
   function choose(i) {
     const p = items[i]; if (!p) return;
     if (p.kind === "GPS") { useGps(sheetField); closeSheet(); return; }
+    if (p.kind === "MAP") { openPicker(); return; }
     const clean = { name: p.name, lat: p.lat, lng: p.lng, kind: p.kind, approx: p.approx, ic: p.ic };
     const recent = store.get("places", []).filter(r => r.name !== clean.name);
     recent.unshift(clean); store.set("places", recent.slice(0, 12));
@@ -257,6 +262,41 @@
     if (sheetField === "from" && !dest) setTimeout(() => openSheet("to"), 250);
     else if (origin && dest) run();
   }
+  // ---------- Elegir un punto en el mapa ----------
+  let pkMap = null, pkTimer = null, pkPlace = null;
+  function openPicker() {
+    $("picker").hidden = false;
+    pushLayer(() => { $("picker").hidden = true; });
+    const cur = sheetField === "from" ? origin : dest;
+    const start = cur && !cur.gps ? cur : gps.pos ? gps.pos : (origin || { lat: 4.6486, lng: -74.0832 });
+    leafletReady(() => {
+      if (!pkMap) {
+        pkMap = makeMap($("pickmap"));
+        pkMap.on("movestart", () => { $("pick-name").textContent = "Moviendo…"; $("pick-sub").textContent = ""; $("pick-ok").disabled = true; });
+        pkMap.on("moveend", () => { clearTimeout(pkTimer); pkTimer = setTimeout(describe, 300); });
+      }
+      setTimeout(() => { pkMap.invalidateSize(); pkMap.setView([start.lat, start.lng], 17); describe(); }, 60);
+    });
+  }
+  async function describe() {
+    const c = pkMap.getCenter(), at = { lat: c.lat, lng: c.lng };
+    pkPlace = { name: "Punto en el mapa", lat: at.lat, lng: at.lng, kind: "Punto en el mapa", ic: "map" };
+    $("pick-ok").disabled = !Geo.inBogota(at);
+    $("pick-name").textContent = Geo.inBogota(at) ? "Punto en el mapa" : "Fuera de Bogotá";
+    $("pick-sub").textContent = "";
+    const r = await Geo.reverse(at.lat, at.lng);
+    if (pkPlace && pkPlace.lat === at.lat && r.name) { pkPlace.name = r.name; $("pick-name").textContent = r.name; $("pick-sub").textContent = r.sub; }
+  }
+  $("pick-back").addEventListener("click", () => popLayer());
+  $("pick-ok").addEventListener("click", () => {
+    if (!pkPlace) return;
+    const chosen = Object.assign({}, pkPlace), field = sheetField;
+    popLayer();                                   // cierra el mapa
+    setTimeout(() => {                            // y luego la búsqueda
+      items = [chosen]; sheetField = field; choose(0);
+    }, 150);
+  });
+
   function setPlace(which, p) { if (which === "from") origin = p; else dest = p; setPick(which, p); }
 
   function note(t, err) { const m = $("msg"); m.hidden = !t; m.className = "note" + (err ? " err" : ""); m.textContent = t || ""; }

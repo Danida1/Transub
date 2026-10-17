@@ -91,24 +91,62 @@
     return { name: label, lat: p.lat, lng: p.lng, kind: "Dirección aprox.", approx: true };
   }
 
-  // Búsqueda de lugares en línea (OpenStreetMap / Photon). Si no hay internet, no devuelve nada.
+  // Búsqueda de lugares en línea: Photon y Nominatim (ambos de OpenStreetMap) a la vez,
+  // con prioridad a lo que está cerca de ti. Si no hay internet, no devuelve nada.
+  function getJSON(url, signal) {
+    if (root.P && root.P.httpGet && root.Android) return root.P.httpGet(url).then(t => JSON.parse(t));
+    return fetch(url, { signal }).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+  }
+  const hav = (a, b, c, d) => { const R = 6371000, t = Math.PI / 180, x = Math.sin((c - a) * t / 2) ** 2 + Math.cos(a * t) * Math.cos(c * t) * Math.sin((d - b) * t / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+  async function photon(q, near, signal) {
+    const url = `https://photon.komoot.io/api/?limit=15&lat=${near.lat.toFixed(4)}&lon=${near.lng.toFixed(4)}&location_bias_scale=0.4&bbox=-74.25,4.45,-73.99,4.85&q=` + encodeURIComponent(q);
+    const j = await getJSON(url, signal);
+    return (j.features || []).map(f => {
+      const p = f.properties || {}, c = f.geometry.coordinates;
+      const name = p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || "Lugar";
+      const sub = [p.street ? p.street + (p.housenumber ? " # " + p.housenumber : "") : "", p.district || p.locality || ""].filter(Boolean).join(" · ");
+      return { name, sub, lat: c[1], lng: c[0], kind: "Lugar" };
+    });
+  }
+  async function nominatim(q, near, signal) {
+    const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=15&countrycodes=co&accept-language=es&bounded=1&viewbox=-74.25,4.85,-73.99,4.45&q=" + encodeURIComponent(q);
+    const j = await getJSON(url, signal);
+    return (j || []).map(r => {
+      const parts = (r.display_name || "").split(",").map(x => x.trim());
+      const name = r.name || parts[0] || "Lugar";
+      const sub = parts.slice(1, 4).filter(x => x && !/^(Bogotá|Colombia|Distrito Capital)/i.test(x)).join(" · ");
+      return { name, sub, lat: +r.lat, lng: +r.lon, kind: "Lugar" };
+    });
+  }
   let ctrl = null;
-  async function searchOnline(q) {
+  async function searchOnline(q, near) {
     if (ctrl) ctrl.abort();
     ctrl = new AbortController();
-    const url = "https://photon.komoot.io/api/?limit=6&lat=4.65&lon=-74.08&bbox=-74.25,4.45,-73.99,4.85&q=" + encodeURIComponent(q + " Bogotá");
-    try {
-      let j;
-      if (root.P && root.P.httpGet && root.Android) j = JSON.parse(await root.P.httpGet(url));
-      else { const r = await fetch(url, { signal: ctrl.signal }); if (!r.ok) return []; j = await r.json(); }
-      return (j.features || []).map(f => {
-        const p = f.properties || {}, c = f.geometry.coordinates;
-        const name = p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || "Lugar";
-        const sub = [p.street && p.name ? p.street + (p.housenumber ? " " + p.housenumber : "") : "", p.district || p.locality || ""].filter(Boolean).join(" · ");
-        return { name, sub, lat: c[1], lng: c[0], kind: "Lugar" };
-      }).filter(inBogota);
-    } catch (e) { return []; }
+    near = near || { lat: 4.65, lng: -74.08 };
+    const [a, b] = await Promise.all([photon(q, near, ctrl.signal).catch(() => []), nominatim(q, near, ctrl.signal).catch(() => [])]);
+    const out = [];
+    for (const p of a.concat(b)) {
+      if (!inBogota(p)) continue;
+      if (out.some(o => norm(o.name) === norm(p.name) && hav(o.lat, o.lng, p.lat, p.lng) < 120)) continue;   // repetido
+      p.dist = hav(near.lat, near.lng, p.lat, p.lng);
+      out.push(p);
+    }
+    // Primero los que tienen todas las palabras buscadas (por ejemplo "notaria 23"), luego por cercanía
+    const words = norm(q).split(/\s+/).filter(w => w.length > 1 || /\d/.test(w));
+    const full = p => { const n = norm(p.name + " " + (p.sub || "")); return words.every(w => /\d/.test(w) ? new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(n) : n.includes(w)) ? 0 : 1; };
+    out.sort((x, y) => (full(x) - full(y)) || (x.dist - y.dist));
+    return out.slice(0, 15);
   }
 
-  root.Geo = { parseAddress, searchOnline, addAnchors, norm, inBogota };
+  // Nombre de un punto del mapa (dirección o lugar más cercano)
+  async function reverse(lat, lng) {
+    try {
+      const j = await getJSON(`https://photon.komoot.io/reverse?lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}&limit=1`);
+      const p = (j.features && j.features[0] && j.features[0].properties) || {};
+      const street = p.street ? p.street + (p.housenumber ? " # " + p.housenumber : "") : "";
+      return { name: p.name || street || "", sub: [p.name ? street : "", p.district || p.locality || ""].filter(Boolean).join(" · ") };
+    } catch (e) { return { name: "", sub: "" }; }
+  }
+
+  root.Geo = { parseAddress, searchOnline, reverse, addAnchors, norm, inBogota };
 })(typeof window !== "undefined" ? window : globalThis);

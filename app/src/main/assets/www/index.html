@@ -76,6 +76,8 @@ button{cursor:pointer}
 .seg2 button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .tag.alt{background:var(--sunk);color:var(--ink)}
 .meta .cost b{color:var(--ink);font-size:16px}
+.pick-pin{position:absolute;left:50%;top:50%;z-index:900;pointer-events:none;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center}
+.pick-pin i{width:3px;height:14px;background:#B3122B}
 .modal{position:fixed;inset:0;z-index:2200;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
 .modal-card{width:100%;max-width:560px;background:var(--surface);border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column}
 .modal-card h3{margin:0 0 8px;font-family:var(--f-display);font-size:22px}
@@ -348,6 +350,19 @@ button{cursor:pointer}
     </div>
   </div>
   <div class="sheet-body"><div class="inner" id="sres"></div></div>
+</div>
+
+<!-- Elegir en el mapa -->
+<div class="nav" id="picker" hidden style="z-index:2300">
+  <div id="pickmap" style="position:absolute;inset:0"></div>
+  <div class="pick-pin" aria-hidden="true"><div class="pin-end"></div><i></i></div>
+  <div class="nav-top">
+    <button class="iconbtn" id="pick-back" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="instr"><div><b>Mueve el mapa</b><small>Deja el marcador rojo sobre el lugar exacto</small></div></div>
+  </div>
+  <div class="nav-bottom">
+    <div class="eta"><div style="min-width:0"><b id="pick-name" style="display:block;font-size:17px">Punto en el mapa</b><small id="pick-sub"></small></div><button class="go" id="pick-ok" style="flex:none;min-width:0">Usar este punto</button></div>
+  </div>
 </div>
 
 <!-- Programar viaje -->

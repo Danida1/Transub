@@ -277,7 +277,7 @@
     $("results").innerHTML = '<div class="loading"><div class="spin"></div>Calculando rutas en servicio…</div>';
     setTimeout(() => {
       options = P.net.plan(origin, dest, planWhen || new Date()); selected = 0;
-      renderResults(); drawPreview();
+      renderResults(); drawPreview(); loadWalks();
     }, 30);
   }
   $("form").addEventListener("submit", e => { e.preventDefault(); run(); });
@@ -291,16 +291,20 @@
   function headOf(l) { const p = P.net.pats[l.pat]; return p.h || P.net.routes[p.r].l || P.net.name[p.s[p.s.length - 1]]; }
   P.headOf = headOf; P.stopLabel = stopLabel;
 
+  function turnsHtml(l) {
+    if (!l.walk || !l.walk.steps.length) return "";
+    return '<ol class="turns">' + l.walk.steps.slice(0, 10).map(t => `<li>${esc(t.text)}${t.dist >= 10 ? ` <span>${meters(t.dist)}</span>` : ""}</li>`).join("") + "</ol>";
+  }
   function stepsFor(op) {
     const net = P.net, out = [];
     op.legs.forEach((l, i) => {
       if (l.kind === "walk") {
         if (l.meters < 40 && op.legs.length > 1) return;
         const target = l.toPoint ? (i === op.legs.length - 1 ? "tu destino" : l.toPoint.name) : stopLabel(l.to);
-        out.push({ b: '<span class="badge walk">A PIE</span>', t: `Camina hasta ${esc(target)}`, s: meters(l.meters), m: fmtDur(l.sec) });
+        out.push({ b: '<span class="badge walk">A PIE</span>', t: `Camina hasta ${esc(target)}`, s: meters(l.walk ? l.walk.dist : l.meters) + turnsHtml(l), m: fmtDur(l.walk ? l.walk.dur : l.sec) });
       } else if (l.kind === "xfer") {
         const same = net.parent[l.from] >= 0 && net.parent[l.from] === net.parent[l.to];
-        out.push({ b: '<span class="badge walk">CAMBIO</span>', t: same ? `Cambia de vagón en ${esc(stopLabel(l.to))}` : `Camina hasta ${esc(stopLabel(l.to))}`, s: same ? "Dentro de la misma estación" : meters(l.meters), m: fmtDur(l.sec) });
+        out.push({ b: '<span class="badge walk">CAMBIO</span>', t: same ? `Cambia de vagón en ${esc(stopLabel(l.to))}` : `Camina hasta ${esc(stopLabel(l.to))}`, s: same ? "Dentro de la misma estación" : meters(l.walk ? l.walk.dist : l.meters) + turnsHtml(l), m: fmtDur(l.sec) });
       } else {
         const r = net.routes[l.route], n = l.apos - l.bpos;
         out.push({ b: badgeHtml(r), t: `${esc(kindLabel(r))} ${esc(r.s)} hacia ${esc(headOf(l))}`,
@@ -347,7 +351,7 @@
       el.innerHTML = html;
       el.addEventListener("click", e => {
         if (e.target.closest("[data-start]")) { P.startNav(op, origin, dest, base); return; }
-        if (selected !== idx) { selected = idx; renderResults(); drawPreview(); }
+        if (selected !== idx) { selected = idx; renderResults(); drawPreview(); loadWalks(); }
       });
       box.appendChild(el);
     });
@@ -355,10 +359,15 @@
 
   // Vista previa del recorrido con tu posición
   let pmap = null, player = null, pme = null;
+  // Trae las caminatas por la calle de la opción elegida y vuelve a dibujar
+  function loadWalks() {
+    const op = options[selected]; if (!op) return;
+    P.fetchWalks(op).then(got => { if (got && options[selected] === op) { renderResults(); drawPreview(); } });
+  }
   function drawPreview() {
     const op = options[selected], el = $("previewmap");
     el.hidden = !op; if (!op) return;
-    const segs = op.legs.map(l => ({ l, c: P.net.coords(l) }));
+    const segs = op.legs.map(l => ({ l, c: P.legCoords(l) }));
     if (!window.L) {
       P.drawSvg(el, segs.map(s => ({ c: s.c, color: s.l.kind === "ride" ? "#" + P.net.routes[s.l.route].c : css("--ink"), dash: s.l.kind !== "ride" })),
         [{ p: [origin.lat, origin.lng] }, { p: [dest.lat, dest.lng], end: true }]);
@@ -369,7 +378,7 @@
     for (const { l, c } of segs) {
       all.push(...c);
       if (l.kind === "ride") L.polyline(c, { color: "#" + P.net.routes[l.route].c, weight: 6, opacity: .92 }).addTo(player);
-      else L.polyline(c, { color: css("--ink"), weight: 3, dashArray: "2 8", opacity: .85 }).addTo(player);
+      else { L.polyline(c, { color: "#fff", weight: 7, opacity: .85 }).addTo(player); L.polyline(c, { color: "#16191A", weight: 4, dashArray: "1 8", lineCap: "round" }).addTo(player); }
     }
     for (const { l } of segs) if (l.kind === "ride") for (const s of [l.from, l.to])
       L.circleMarker([P.net.lat[s], P.net.lng[s]], { radius: 6, color: "#" + P.net.routes[l.route].c, weight: 3, fillColor: "#fff", fillOpacity: 1 }).bindTooltip(P.net.name[s]).addTo(player);

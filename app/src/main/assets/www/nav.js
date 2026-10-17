@@ -27,13 +27,45 @@
 
   function keepAwake(on) { try { if (window.Android && Android.keepScreenOn) Android.keepScreenOn(!!on); } catch (e) {} }
 
+  function legsOf(op) {
+    return op.legs.filter(l => !(l.kind === "walk" && l.meters < 25 && op.legs.length > 1)).map(l => {
+      const x = { l, c: P.legCoords(l) };
+      x.len = lineLen(x.c);
+      // posición de cada giro dentro del trazado de la caminata
+      if (l.walk) x.turns = l.walk.steps.map(t => { const r = distToPolyline(t.loc, x.c); return { ...t, at: r.i + r.t }; });
+      return x;
+    });
+  }
+
+  function drawTrip(fit) {
+    if (!trip || !map) return;
+    const net = P.net, { origin, dest } = trip;
+    layer.clearLayers(); me = null;
+    const all = [];
+    for (const { l, c } of trip.legs) {
+      all.push(...c);
+      if (l.kind === "ride") {
+        L.polyline(c, { color: "#fff", weight: 10, opacity: .9 }).addTo(layer);
+        L.polyline(c, { color: "#" + net.routes[l.route].c, weight: 7 }).addTo(layer);
+      } else {
+        L.polyline(c, { color: "#fff", weight: 8, opacity: .9 }).addTo(layer);
+        L.polyline(c, { color: "#16191A", weight: 5, dashArray: "1 9", lineCap: "round" }).addTo(layer);
+      }
+    }
+    for (const { l } of trip.legs) if (l.kind === "ride") {
+      const col = "#" + net.routes[l.route].c;
+      L.circleMarker([net.lat[l.from], net.lng[l.from]], { radius: 8, color: col, weight: 4, fillColor: "#fff", fillOpacity: 1 }).bindTooltip("Sube: " + net.name[l.from], { className: "pin-label" }).addTo(layer);
+      L.circleMarker([net.lat[l.to], net.lng[l.to]], { radius: 8, color: col, weight: 4, fillColor: "#fff", fillOpacity: 1 }).bindTooltip("Baja: " + net.name[l.to], { className: "pin-label" }).addTo(layer);
+    }
+    P.endMarker([dest.lat, dest.lng], dest.name.length > 26 ? dest.name.slice(0, 25) + "…" : dest.name).addTo(layer);
+    if (!origin.gps) P.startMarker([origin.lat, origin.lng]).addTo(layer);
+    map.invalidateSize();
+    if (P.gps.pos) { update(P.gps.pos); }
+    else if (fit) { map.fitBounds(L.latLngBounds(all).pad(0.15)); render(null); }
+  }
+
   P.startNav = function (op, origin, dest, base) {
-    const net = P.net;
-    trip = {
-      op, origin, dest, base, cur: 0, arrived: false,
-      legs: op.legs.filter(l => !(l.kind === "walk" && l.meters < 25 && op.legs.length > 1)).map(l => ({ l, c: net.coords(l) }))
-    };
-    trip.legs.forEach(x => { x.len = lineLen(x.c); });
+    trip = { op, origin, dest, base, cur: 0, arrived: false, legs: legsOf(op) };
     $("nav").hidden = false; follow = true; $("recenter").hidden = true;
     P.pushLayer(stop);
     keepAwake(true);
@@ -43,25 +75,11 @@
         layer = L.layerGroup().addTo(map);
         map.on("dragstart", () => { if (!ignoreMove) { follow = false; $("recenter").hidden = false; } });
       }
-      layer.clearLayers(); me = null;
-      const all = [];
-      for (const { l, c } of trip.legs) {
-        all.push(...c);
-        if (l.kind === "ride") {
-          L.polyline(c, { color: "#fff", weight: 10, opacity: .9 }).addTo(layer);
-          L.polyline(c, { color: "#" + net.routes[l.route].c, weight: 7 }).addTo(layer);
-        } else L.polyline(c, { color: P.css("--ink"), weight: 4, dashArray: "1 9", lineCap: "round" }).addTo(layer);
-      }
-      for (const { l } of trip.legs) if (l.kind === "ride") {
-        const col = "#" + net.routes[l.route].c;
-        L.circleMarker([net.lat[l.from], net.lng[l.from]], { radius: 8, color: col, weight: 4, fillColor: "#fff", fillOpacity: 1 }).bindTooltip("Sube: " + net.name[l.from], { className: "pin-label" }).addTo(layer);
-        L.circleMarker([net.lat[l.to], net.lng[l.to]], { radius: 8, color: col, weight: 4, fillColor: "#fff", fillOpacity: 1 }).bindTooltip("Baja: " + net.name[l.to], { className: "pin-label" }).addTo(layer);
-      }
-      P.endMarker([dest.lat, dest.lng], dest.name.length > 26 ? dest.name.slice(0, 25) + "…" : dest.name).addTo(layer);
-      if (!origin.gps) P.startMarker([origin.lat, origin.lng]).addTo(layer);
-      map.invalidateSize();
-      if (P.gps.pos) update(P.gps.pos);
-      else { map.fitBounds(L.latLngBounds(all).pad(0.15)); render(null); }
+      drawTrip(true);
+    });
+    // Si las caminatas por la calle llegan después, se redibujan
+    P.fetchWalks(op).then(got => {
+      if (got && trip && trip.op === op) { const cur = trip.cur; trip.legs = legsOf(op); trip.cur = Math.min(cur, trip.legs.length - 1); drawTrip(false); }
     });
     P.startGps();
     if (off) off();
@@ -115,6 +133,18 @@
     render(pos);
   }
 
+  // Próximo giro de la caminata: "En 80 m: gira a la derecha por Calle 63 Sur"
+  function nextTurn(X, pos) {
+    if (!X.turns || !X.turns.length) return "";
+    const at = pos && trip.proj ? trip.proj.i + trip.proj.t : -1;
+    const t = X.turns.find(t => t.at > at + 1e-6);
+    if (!t) return "";
+    if (!pos) return t.text;
+    const d = Router.hav(pos.lat, pos.lng, t.loc[0], t.loc[1]);
+    const txt = t.text.charAt(0).toLowerCase() + t.text.slice(1);
+    return d < 20 ? "Ahora " + txt : "En " + P.meters(d) + ": " + txt;
+  }
+
   function render(pos) {
     if (!trip) return;
     const net = P.net, X = trip.legs[trip.cur], l = X.l;
@@ -123,12 +153,18 @@
     if (pos && trip.proj) doneLen = lenUpTo(X.c, trip.proj.i, trip.proj.t);
     const leftHere = Math.max(0, X.len - doneLen);
     if (trip.arrived) { title = "Llegaste a tu destino"; sub = trip.dest.name; }
-    else if (l.kind === "walk" && trip.cur === trip.legs.length - 1) { title = "Camina hasta tu destino"; sub = "Faltan " + P.meters(pos ? Router.hav(pos.lat, pos.lng, trip.dest.lat, trip.dest.lng) : l.meters); }
+    else if (l.kind === "walk" && trip.cur === trip.legs.length - 1) {
+      title = "Camina hasta tu destino"; sub = "Faltan " + P.meters(pos ? Math.max(leftHere, Router.hav(pos.lat, pos.lng, trip.dest.lat, trip.dest.lng)) : (l.walk ? l.walk.dist : l.meters));
+      const turn = nextTurn(X, pos);
+      if (turn) { sub = "Hacia tu destino · " + sub.toLowerCase(); title = turn; }
+    }
     else if (l.kind === "walk" || l.kind === "xfer") {
       const nx = trip.legs[trip.cur + 1];
       const target = l.to != null ? P.stopLabel(l.to) : "el paradero";
       title = "Camina hasta " + target;
       sub = "Faltan " + P.meters(leftHere) + (nx && nx.l.kind === "ride" ? " · ahí tomas la " + net.routes[nx.l.route].s : "");
+      const turn = nextTurn(X, pos);
+      if (turn) { sub = title + " · " + sub.charAt(0).toLowerCase() + sub.slice(1); title = turn; }
       if (pos && leftHere < 60 && nx && nx.l.kind === "ride") {
         const r = net.routes[nx.l.route]; badge = P.badgeHtml(r);
         title = "Espera la " + r.s + " hacia " + P.headOf(nx.l);

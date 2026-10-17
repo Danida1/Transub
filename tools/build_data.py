@@ -200,6 +200,47 @@ def schedules(p, daytypes):
     return out
 
 
+# Colores como en la señalización de TransMilenio: cada troncal lleva el color de la zona de su letra.
+ZONE_COLORS = {
+    "A": "1D3F8F",  # Caracas: azul oscuro
+    "B": "7AB648",  # Autonorte: verde claro
+    "C": "F5A800",  # Suba: amarillo
+    "D": "6C2C91",  # Calle 80: morado
+    "E": "8E5B3E",  # NQS central: café
+    "F": "E30613",  # Américas: rojo
+    "G": "00A3DA",  # NQS sur: azul claro
+    "H": "F07D00",  # Caracas sur: naranja
+    "J": "C9A227",  # Eje Ambiental: dorado
+    "K": "C8A27C",  # Calle 26: beige
+    "L": "EC6FA5",  # Carrera 10: rosado
+    "M": "3FB8AF",  # Carrera Séptima: verde agua
+}
+
+
+def route_color(k, short, agency):
+    if k == "T":
+        first = short[:1].upper()
+        return ZONE_COLORS.get(first, "263238")  # rutas fáciles (1 a 8): gris oscuro
+    if k == "A":
+        return "3E9E3E"          # alimentadores: verde
+    if k == "C":
+        return "00A19A"          # TransMiCable
+    if k == "D":
+        return "0D5C63"          # duales
+    if "complementario" in agency:
+        return "E87722"          # SITP complementario: naranja
+    if "especial" in agency:
+        return "8C1D40"          # SITP especial: vinotinto
+    return "1F6FB2"              # SITP urbano: azul
+
+
+def text_on(hexcolor):
+    r, g, b = (int(hexcolor[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    lin = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+    return "16191A" if L > 0.3 else "FFFFFF"
+
+
 def build(data, source):
     zf = zipfile.ZipFile(io.BytesIO(data))
 
@@ -450,12 +491,14 @@ def build(data, source):
         r = routes[rid]
         r["route_long_name"] = tidy(r.get("route_long_name"))
         k = kind(ri, r)
-        default = {"T": "B3122B", "A": "1E7A4C", "C": "6D3F9A", "D": "C0682A"}.get(k, "1F7FA8")
+        short = (r.get("route_short_name") or "").strip()
+        ag = agencies.get(r.get("agency_id", ""), "").lower()
+        color = route_color(k, short, ag)
         out_routes.append({
-            "s": (r.get("route_short_name") or "").strip(),
+            "s": short,
             "l": (r.get("route_long_name") or "").strip(),
-            "c": clean_color(r.get("route_color"), default),
-            "x": clean_color(r.get("route_text_color"), "FFFFFF"),
+            "c": color,
+            "x": text_on(color),
             "k": k,
         })
 

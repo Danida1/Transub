@@ -25,6 +25,13 @@ import android.widget.FrameLayout;
 
 import androidx.webkit.WebViewAssetLoader;
 
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String START = "https://" + HOST + "/assets/www/index.html";
@@ -71,6 +78,43 @@ public class MainActivity extends Activity {
                     if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                     else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 });
+            }
+
+            // Descarga de rutas a pie y lugares (solo a estos dos servidores) sin las restricciones del navegador
+            @JavascriptInterface
+            public void httpGet(final int id, final String url) {
+                new Thread(() -> {
+                    boolean ok = false;
+                    String body;
+                    try {
+                        Uri u = Uri.parse(url);
+                        String h = u.getHost();
+                        if (!"https".equals(u.getScheme()) || h == null
+                                || !(h.equals("routing.openstreetmap.de") || h.equals("photon.komoot.io"))) {
+                            throw new Exception("servidor no permitido");
+                        }
+                        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                        c.setConnectTimeout(10000);
+                        c.setReadTimeout(12000);
+                        c.setRequestProperty("User-Agent", "Paradero/1.0 (app de rutas de Bogota; Android)");
+                        int code = c.getResponseCode();
+                        InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
+                        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                        if (in != null) {
+                            byte[] buf = new byte[8192];
+                            int n;
+                            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                            in.close();
+                        }
+                        body = bo.toString("UTF-8");
+                        ok = code < 400;
+                        c.disconnect();
+                    } catch (Exception e) {
+                        body = String.valueOf(e.getMessage());
+                    }
+                    final String js = "window.__nativeHttp&&window.__nativeHttp(" + id + "," + ok + "," + JSONObject.quote(body) + ")";
+                    web.post(() -> web.evaluateJavascript(js, null));
+                }).start();
             }
         }, "Android");
 

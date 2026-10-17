@@ -98,9 +98,9 @@
     ctrl = new AbortController();
     const url = "https://photon.komoot.io/api/?limit=6&lat=4.65&lon=-74.08&bbox=-74.25,4.45,-73.99,4.85&q=" + encodeURIComponent(q + " Bogotá");
     try {
-      const r = await fetch(url, { signal: ctrl.signal });
-      if (!r.ok) return [];
-      const j = await r.json();
+      let j;
+      if (root.P && root.P.httpGet && root.Android) j = JSON.parse(await root.P.httpGet(url));
+      else { const r = await fetch(url, { signal: ctrl.signal }); if (!r.ok) return []; j = await r.json(); }
       return (j.features || []).map(f => {
         const p = f.properties || {}, c = f.geometry.coordinates;
         const name = p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || "Lugar";

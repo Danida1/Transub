@@ -6,7 +6,12 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.Context;
 import android.graphics.Insets;
+import android.media.AudioAttributes;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.speech.tts.TextToSpeech;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -34,6 +39,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
@@ -44,6 +50,8 @@ public class MainActivity extends Activity {
     private GeolocationPermissions.Callback pendingGeo;
     private String pendingOrigin;
     private String pendingShared;   // texto o enlace compartido desde Google Maps
+    private TextToSpeech tts;       // voz para los avisos del modo viaje
+    private boolean ttsReady;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -77,8 +85,33 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
+        // Voz en español para "Próxima parada", "Bájate aquí", etc.
+        tts = new TextToSpeech(this, status -> {
+            if (status != TextToSpeech.SUCCESS) return;
+            int r = tts.setLanguage(new Locale("es", "CO"));
+            if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) r = tts.setLanguage(new Locale("es", "ES"));
+            if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) tts.setLanguage(new Locale("es"));
+            tts.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());
+            tts.setSpeechRate(0.95f);
+            ttsReady = true;
+        });
+
         // Puente mínimo: mantener la pantalla encendida durante el modo viaje
         web.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void speak(String text) {
+                if (tts != null && ttsReady) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "aviso");
+            }
+
+            @JavascriptInterface
+            public void vibrate(int ms) {
+                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                if (v == null || !v.hasVibrator()) return;
+                v.vibrate(VibrationEffect.createWaveform(new long[]{0, ms / 2, 120, ms / 2}, -1));
+            }
+
             @JavascriptInterface
             public void keepScreenOn(boolean on) {
                 runOnUiThread(() -> {
@@ -305,6 +338,12 @@ public class MainActivity extends Activity {
             text = intent.getData().toString();
         }
         if (text != null && !text.trim().isEmpty()) pendingShared = text;
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (tts != null) tts.shutdown();
+        super.onDestroy();
     }
 
     @Override

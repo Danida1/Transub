@@ -25,6 +25,36 @@
     return s;
   }
 
+  // ---------- Avisos por voz y vibración ----------
+  let spoken = new Set();
+  const voiceOn = () => P.store.get("voice", true);
+  function speak(t) {
+    try { if (window.Android && Android.speak) { Android.speak(t); return; } } catch (e) {}
+    if ("speechSynthesis" in window) { const u = new SpeechSynthesisUtterance(t); u.lang = "es-CO"; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+  }
+  function buzz() {
+    try { if (window.Android && Android.vibrate) Android.vibrate(450); else if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+  }
+  // Cada aviso suena una sola vez por viaje
+  function say(key, text) {
+    if (spoken.has(key)) return;
+    spoken.add(key);
+    buzz();
+    if (voiceOn()) speak(text);
+  }
+  function voiceIcon() {
+    const on = voiceOn();
+    $("nav-voice").setAttribute("aria-label", on ? "Silenciar avisos de voz" : "Activar avisos de voz");
+    $("nav-voice").innerHTML = on
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
+  }
+  $("nav-voice").addEventListener("click", () => {
+    const on = !voiceOn(); P.store.set("voice", on); voiceIcon();
+    if (on) speak("Avisos de voz activados");
+  });
+  voiceIcon();
+
   function keepAwake(on) { try { if (window.Android && Android.keepScreenOn) Android.keepScreenOn(!!on); } catch (e) {} }
 
   function legsOf(op) {
@@ -62,6 +92,7 @@
 
   P.startNav = function (op, origin, dest, base) {
     trip = { op, origin, dest, base, cur: 0, arrived: false, legs: legsOf(op) };
+    spoken = new Set();
     $("nav").hidden = false; follow = true; $("recenter").hidden = true;
     P.pushLayer(stop);
     keepAwake(true);
@@ -141,6 +172,9 @@
     return d < 20 ? "Ahora " + txt : "En " + P.meters(d) + ": " + txt;
   }
 
+  // "B13" se lee "B 13" y "6-2" como "6 2" para que la voz lo diga claro
+  const spell = code => String(code).replace(/([A-Za-z])(\d)/g, "$1 $2").replace(/-/g, " ");
+
   function render(pos) {
     if (!trip) return;
     const net = P.net, X = trip.legs[trip.cur], l = X.l;
@@ -148,7 +182,7 @@
     let doneLen = 0;
     if (pos && trip.proj) doneLen = lenUpTo(X.c, trip.proj.i, trip.proj.t);
     const leftHere = Math.max(0, X.len - doneLen);
-    if (trip.arrived) { title = "Llegaste a tu destino"; sub = trip.dest.name; }
+    if (trip.arrived) { title = "Llegaste a tu destino"; sub = trip.dest.name; say("arrive", "Llegaste a tu destino."); }
     else if (l.kind === "walk" && trip.cur === trip.legs.length - 1) {
       title = "Camina hasta tu destino"; sub = "Faltan " + P.meters(pos ? Math.max(leftHere, Router.hav(pos.lat, pos.lng, trip.dest.lat, trip.dest.lng)) : (l.walk ? l.walk.dist : l.meters));
       const turn = nextTurn(X, pos);
@@ -165,6 +199,7 @@
         const r = net.routes[nx.l.route]; badge = P.badgeHtml(r);
         title = "Espera la " + r.s + " hacia " + P.headOf(nx.l);
         sub = "En " + P.stopLabel(nx.l.from) + " · pasa cada ~" + Math.round(nx.l.hw) + " min";
+        say("board" + trip.cur, `Llegaste a ${P.stopLabel(nx.l.from)}. Espera la ruta ${spell(r.s)} hacia ${P.headOf(nx.l)}.`);
       }
     } else {
       const r = net.routes[l.route], p = net.pats[l.pat]; badge = P.badgeHtml(r);
@@ -174,8 +209,8 @@
       const left = l.apos - idx;
       if (!pos || (idx === l.bpos && trip.proj && trip.proj.i === 0 && trip.proj.t < .05)) {
         title = "Toma la " + r.s + " hacia " + P.headOf(l); sub = "En " + P.stopLabel(l.from) + " · pasa cada ~" + Math.round(l.hw) + " min";
-      } else if (left <= 0) { title = "Bájate aquí: " + net.name[l.to]; sub = P.kindLabel(r) + " " + r.s; }
-      else if (left === 1) { title = "Bájate en la próxima: " + net.name[l.to]; sub = P.kindLabel(r) + " " + r.s; }
+      } else if (left <= 0) { title = "Bájate aquí: " + net.name[l.to]; sub = P.kindLabel(r) + " " + r.s; say("alight" + trip.cur, `Llegaste a ${net.name[l.to]}. Bájate aquí.`); }
+      else if (left === 1) { title = "Bájate en la próxima: " + net.name[l.to]; sub = P.kindLabel(r) + " " + r.s; say("next" + trip.cur, `Próxima parada: ${net.name[l.to]}. Prepárate para bajar.`); }
       else { title = "Bájate en " + net.name[l.to]; sub = "Faltan " + left + " paradas · " + P.kindLabel(r) + " " + r.s; }
     }
     $("instr").innerHTML = `${badge}<div><b>${esc(title)}</b><small>${esc(sub)}</small></div>`;

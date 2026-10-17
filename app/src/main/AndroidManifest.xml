@@ -35,5 +35,10 @@
                 <data android:scheme="geo" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".WebPageActivity"
+            android:exported="false"
+            android:label="Noticias en X"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
     </application>
 </manifest>

@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
@@ -70,6 +71,9 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setAllowFileAccess(false);
         s.setMediaPlaybackRequiresUserGesture(true);
+        // Las publicaciones de X insertadas en Novedades necesitan la sesión de X (cookies de terceros)
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
         // Puente mínimo: mantener la pantalla encendida durante el modo viaje
         web.addJavascriptInterface(new Object() {
@@ -78,6 +82,16 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                     else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                });
+            }
+
+            // Abre X dentro de la app (visor con sesión guardada)
+            @JavascriptInterface
+            public void openX(String url) {
+                runOnUiThread(() -> {
+                    Intent i = new Intent(MainActivity.this, WebPageActivity.class);
+                    i.putExtra("url", url);
+                    startActivity(i);
                 });
             }
 
@@ -195,8 +209,15 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (HOST.equals(uri.getHost())) return false;
-                // Enlaces externos (WhatsApp, X, Facebook) se abren en su app o en el navegador
+                if (HOST.equals(uri.getHost()) || !request.isForMainFrame()) return false;
+                // Las publicaciones de X se ven dentro de la app
+                if (WebPageActivity.isX(uri)) {
+                    Intent i = new Intent(MainActivity.this, WebPageActivity.class);
+                    i.putExtra("url", uri.toString());
+                    startActivity(i);
+                    return true;
+                }
+                // Otros enlaces (WhatsApp, Facebook) se abren en su app o en el navegador
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (ActivityNotFoundException ignored) { }

@@ -250,6 +250,11 @@ button{cursor:pointer}
 .stops li.ends i{border-color:var(--ink);background:var(--ink)}
 .stops li.ends{font-weight:700}
 
+.xbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-height:160px;overflow:hidden}
+.xbox iframe{width:100%!important}
+.xbox a.twitter-timeline{display:block;padding:16px;color:var(--muted);font-size:15px;text-decoration:none}
+.xhelp{display:flex;flex-direction:column;gap:10px}
+.xhelp .chipbtn{color:var(--ink)}
 .channels{display:flex;flex-direction:column;gap:10px}
 .chan{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;color:inherit;text-decoration:none}
 .chan .ic{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--sunk);font-family:var(--f-display);font-weight:700;font-size:17px}
@@ -323,8 +328,20 @@ button{cursor:pointer}
 
   <!-- NOVEDADES -->
   <section id="view-nov" class="view" hidden>
-    <div class="sec-h"><h2>Novedades en la vía</h2></div>
-    <p class="fine">TransMilenio publica cierres, desvíos, manifestaciones y cambios de ruta en sus canales oficiales. Toca uno para abrirlo en su aplicación.</p>
+    <div class="sec-h"><h2>Lo último en X</h2></div>
+    <div class="chips" id="xacc">
+      <button data-acc="TransMilenio" class="on">@TransMilenio</button>
+      <button data-acc="BogotaTransito">@BogotaTransito</button>
+      <button data-acc="SectorMovilidad">@SectorMovilidad</button>
+    </div>
+    <div class="xbox" id="xbox"><div class="hint">Cargando publicaciones…</div></div>
+    <div class="xhelp">
+      <p class="fine">X solo muestra publicaciones a quien tiene sesión iniciada. Si arriba no ves nada, inicia sesión una vez: la app la recuerda.</p>
+      <div class="row"><button type="button" class="chipbtn" id="xlogin">Iniciar sesión en X</button><button type="button" class="chipbtn" id="xopen">Abrir el perfil completo</button></div>
+    </div>
+
+    <div class="sec-h"><h2>Canales oficiales</h2></div>
+    <p class="fine">TransMilenio también publica cierres, desvíos y cambios de ruta en estos canales. Toca uno para abrirlo.</p>
     <div class="channels">
       <a class="chan" href="https://whatsapp.com/channel/0029VaRe8rACRs1htLOKee21">
         <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 2.5 4.2 4.5 4.5l1-1 1.8.9"/></svg></div>
@@ -445,5 +462,6 @@ button{cursor:pointer}
 <script src="walk.js"></script>
 <script src="nav.js"></script>
 <script src="lines.js"></script>
+<script src="news.js"></script>
 </body>
 </html>

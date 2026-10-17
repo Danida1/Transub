@@ -35,10 +35,12 @@
   function buzz() {
     try { if (window.Android && Android.vibrate) Android.vibrate(450); else if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
   }
+  let nativeTrip = false;   // el servicio de Android da los avisos (también en segundo plano)
   // Cada aviso suena una sola vez por viaje
   function say(key, text) {
     if (spoken.has(key)) return;
     spoken.add(key);
+    if (nativeTrip) return;
     buzz();
     if (voiceOn()) speak(text);
   }
@@ -51,6 +53,7 @@
   }
   $("nav-voice").addEventListener("click", () => {
     const on = !voiceOn(); P.store.set("voice", on); voiceIcon();
+    try { if (window.Android && Android.setTripVoice) Android.setTripVoice(on); } catch (e) {}
     if (on) speak("Avisos de voz activados");
   });
   voiceIcon();
@@ -93,6 +96,8 @@
   P.startNav = function (op, origin, dest, base) {
     trip = { op, origin, dest, base, cur: 0, arrived: false, legs: legsOf(op) };
     spoken = new Set();
+    nativeTrip = false;
+    try { if (window.Android && Android.startTrip) nativeTrip = !!Android.startTrip(JSON.stringify(tripAlerts(op, dest)), voiceOn()); } catch (e) { nativeTrip = false; }
     $("nav").hidden = false; follow = true; $("recenter").hidden = true;
     P.pushLayer(stop);
     keepAwake(true);
@@ -118,7 +123,26 @@
   };
 
   P.navTrip = () => trip;
+  // Puntos donde sonará cada aviso, en orden, para el servicio en segundo plano
+  function tripAlerts(op, dest) {
+    const net = P.net, alerts = [];
+    const at = s => ({ lat: net.lat[s], lng: net.lng[s] });
+    op.legs.forEach(l => {
+      if (l.kind !== "ride") return;
+      const r = net.routes[l.route], p = net.pats[l.pat], head = P.headOf(l);
+      alerts.push(Object.assign(at(l.from), { radius: 60, text: `Llegaste a ${P.stopLabel(l.from)}. Espera la ruta ${spell(r.s)} hacia ${head}.`, hint: `Toma la ${r.s} hacia ${head} en ${P.stopLabel(l.from)}` }));
+      if (l.apos - l.bpos >= 2) alerts.push(Object.assign(at(p.s[l.apos - 1]), { radius: 90, text: `Próxima parada: ${net.name[l.to]}. Prepárate para bajar.`, hint: `En la ${r.s}: bájate en ${net.name[l.to]}` }));
+      alerts.push(Object.assign(at(l.to), { radius: 70, text: `Llegaste a ${net.name[l.to]}. Bájate aquí.`, hint: `Bájate en ${net.name[l.to]}` }));
+    });
+    const last = alerts[alerts.length - 1];
+    if (last && Router.hav(last.lat, last.lng, dest.lat, dest.lng) < 120) last.text = `Llegaste a ${net.name[op.legs.filter(l => l.kind === "ride").pop().to]}. Bájate aquí, ya estás en tu destino.`;
+    else alerts.push({ lat: dest.lat, lng: dest.lng, radius: 50, text: "Llegaste a tu destino.", hint: `Camina hasta ${dest.name}` });
+    return { title: "Viaje a " + dest.name, alerts };
+  }
+
   function stop() {
+    try { if (window.Android && Android.stopTrip) Android.stopTrip(); } catch (e) {}
+    nativeTrip = false;
     $("nav").hidden = true; keepAwake(false);
     if (off) { off(); off = null; }
     trip = null;

@@ -100,6 +100,41 @@ public class MainActivity extends Activity {
 
         // Puente mínimo: mantener la pantalla encendida durante el modo viaje
         web.addJavascriptInterface(new Object() {
+            // Viaje en segundo plano: avisos con la pantalla apagada o en otra app
+            @JavascriptInterface
+            public boolean startTrip(String json, boolean voice) {
+                if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    runOnUiThread(() -> requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 8));
+                }
+                if (!hasLocation()) return false;
+                try {
+                    Intent i = new Intent(MainActivity.this, TripService.class).setAction(TripService.ACTION_START);
+                    i.putExtra("trip", json);
+                    i.putExtra("voice", voice);
+                    startForegroundService(i);
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+
+            @JavascriptInterface
+            public void stopTrip() {
+                if (!TripService.running) return;
+                startService(new Intent(MainActivity.this, TripService.class).setAction(TripService.ACTION_STOP));
+            }
+
+            @JavascriptInterface
+            public void setTripVoice(boolean on) {
+                if (!TripService.running) return;
+                startService(new Intent(MainActivity.this, TripService.class).setAction(TripService.ACTION_VOICE).putExtra("voice", on));
+            }
+
+            @JavascriptInterface
+            public boolean tripRunning() {
+                return TripService.running;
+            }
+
             @JavascriptInterface
             public void speak(String text) {
                 if (tts != null && ttsReady) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "aviso");

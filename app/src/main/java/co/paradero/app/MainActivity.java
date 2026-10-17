@@ -40,6 +40,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private GeolocationPermissions.Callback pendingGeo;
     private String pendingOrigin;
+    private String pendingShared;   // texto o enlace compartido desde Google Maps
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -80,7 +81,69 @@ public class MainActivity extends Activity {
                 });
             }
 
-            // Descarga de rutas a pie y lugares (solo a estos dos servidores) sin las restricciones del navegador
+            // Lugar compartido desde otra app (Google Maps): la página lo pide al estar lista
+            @JavascriptInterface
+            public String takeShared() {
+                String t = pendingShared;
+                pendingShared = null;
+                return t;
+            }
+
+            // Sigue un enlace corto de Google Maps (maps.app.goo.gl) hasta la dirección final y devuelve
+            // esa dirección y, si no trae coordenadas, el inicio de la página para buscarlas allí.
+            @JavascriptInterface
+            public void resolveMaps(final int id, final String url) {
+                new Thread(() -> {
+                    boolean ok = false;
+                    String out;
+                    try {
+                        String cur = url;
+                        String body = "";
+                        for (int hop = 0; hop < 6; hop++) {
+                            Uri u = Uri.parse(cur);
+                            String h = u.getHost() == null ? "" : u.getHost();
+                            if (!"https".equals(u.getScheme()) || !(h.equals("maps.app.goo.gl") || h.equals("goo.gl")
+                                    || h.equals("maps.google.com") || h.equals("www.google.com") || h.equals("google.com")
+                                    || h.equals("www.google.com.co") || h.equals("maps.google.com.co"))) break;
+                            HttpURLConnection c = (HttpURLConnection) new URL(cur).openConnection();
+                            c.setInstanceFollowRedirects(false);
+                            c.setConnectTimeout(10000);
+                            c.setReadTimeout(12000);
+                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
+                            c.setRequestProperty("Accept-Language", "es-CO,es;q=0.9");
+                            int code = c.getResponseCode();
+                            String loc = c.getHeaderField("Location");
+                            if (code >= 300 && code < 400 && loc != null) {
+                                cur = new URL(new URL(cur), loc).toString();
+                                c.disconnect();
+                                continue;
+                            }
+                            InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
+                            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                            if (in != null) {
+                                byte[] buf = new byte[8192];
+                                int n;
+                                while ((n = in.read(buf)) > 0 && bo.size() < 600000) bo.write(buf, 0, n);
+                                in.close();
+                            }
+                            body = bo.toString("UTF-8");
+                            c.disconnect();
+                            break;
+                        }
+                        JSONObject j = new JSONObject();
+                        j.put("url", cur);
+                        j.put("body", body);
+                        out = j.toString();
+                        ok = true;
+                    } catch (Exception e) {
+                        out = String.valueOf(e.getMessage());
+                    }
+                    final String js = "window.__nativeHttp&&window.__nativeHttp(" + id + "," + ok + "," + JSONObject.quote(out) + ")";
+                    web.post(() -> web.evaluateJavascript(js, null));
+                }).start();
+            }
+
+            // Descarga de rutas a pie y lugares (solo a estos servidores) sin las restricciones del navegador
             @JavascriptInterface
             public void httpGet(final int id, final String url) {
                 new Thread(() -> {
@@ -96,7 +159,7 @@ public class MainActivity extends Activity {
                         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
                         c.setConnectTimeout(10000);
                         c.setReadTimeout(12000);
-                        c.setRequestProperty("User-Agent", "Paradero/1.0 (app de rutas de Bogota; Android)");
+                        c.setRequestProperty("User-Agent", "Transub/1.0 (app de rutas de Bogota; Android)");
                         int code = c.getResponseCode();
                         InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
                         ByteArrayOutputStream bo = new ByteArrayOutputStream();
@@ -154,8 +217,32 @@ public class MainActivity extends Activity {
             }
         });
 
+        readShared(getIntent());
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(START);
+    }
+
+    // "Compartir" desde Google Maps llega como texto con un enlace; "Abrir con" llega como geo:lat,lng
+    private void readShared(Intent intent) {
+        if (intent == null) return;
+        String text = null;
+        if (Intent.ACTION_SEND.equals(intent.getAction())) {
+            String sub = intent.getStringExtra(Intent.EXTRA_SUBJECT);
+            String body = intent.getStringExtra(Intent.EXTRA_TEXT);
+            text = (sub != null && body != null && !body.contains(sub) ? sub + "\n" : "") + (body != null ? body : "");
+        } else if (Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null) {
+            text = intent.getData().toString();
+        }
+        if (text != null && !text.trim().isEmpty()) pendingShared = text;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        readShared(intent);
+        if (pendingShared != null && web != null)
+            web.evaluateJavascript("window.__sharedPing&&window.__sharedPing()", null);
     }
 
     private boolean hasLocation() {

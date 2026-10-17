@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Paradero</title>
+<title>Transub</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="vendor/leaflet.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'">
 <style>
 :root{
   --bg:#EEF0EE; --surface:#FFFFFF; --sunk:#E3E6E4; --ink:#16191A; --muted:#5D6563; --line:#D2D7D4;
-  --accent:#B3122B; --accent-ink:#FFFFFF; --ok:#1E7A4C; --ok-bg:#E1F2E8; --off:#7A6F64; --off-bg:#ECE8E3; --walk:#8A918F;
+  --accent:#2B7F77; --accent-ink:#FFFFFF; --brand:#3A9E93; --dest:#D9694F; --ok:#1E7A4C; --ok-bg:#E1F2E8; --off:#7A6F64; --off-bg:#ECE8E3; --walk:#8A918F;
   --f-display:"Archivo Narrow","Arial Narrow",Arial,sans-serif;
   --f-body:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,"Roboto Mono",monospace;
@@ -17,7 +17,7 @@
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#111415; --surface:#1A1E1F; --sunk:#252A2B; --ink:#EDF0EF; --muted:#9AA3A1; --line:#2E3536;
-  --accent:#E8445C; --accent-ink:#1A0006; --ok:#49B97F; --ok-bg:#16291F; --off:#A89C90; --off-bg:#2A2622; --walk:#7C8583; color-scheme:dark}
+  --accent:#6CC7BA; --accent-ink:#0D2B28; --brand:#6CC7BA; --dest:#F08A70; --ok:#49B97F; --ok-bg:#16291F; --off:#A89C90; --off-bg:#2A2622; --walk:#7C8583; color-scheme:dark}
   .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -33,8 +33,9 @@ button{cursor:pointer}
 
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px}
-.mark{width:36px;height:36px;border-radius:9px;background:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:var(--accent-ink);font-size:21px}
-.brand h1{font-family:var(--f-display);font-weight:700;font-size:27px;margin:0;line-height:1}
+.mark{width:40px;height:40px;border-radius:11px;flex:none}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;line-height:1;letter-spacing:.01em}
+.brand h1 span{color:var(--brand)}
 .brand small{display:block;color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
 .clock{font-family:var(--f-num);font-size:13px;color:var(--muted);text-align:right}
 .clock b{display:block;font-family:var(--f-body);font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
@@ -44,7 +45,7 @@ button{cursor:pointer}
 .fields{display:grid;grid-template-columns:20px 1fr 44px;gap:10px 10px;align-items:center}
 .rail{grid-row:1/3;align-self:stretch;display:flex;flex-direction:column;align-items:center;padding-block:26px}
 .rail i{width:12px;height:12px;border-radius:50%;border:3px solid var(--ink);flex:none}
-.rail i.end{background:var(--accent);border-color:var(--accent);border-radius:3px}
+.rail i.end{background:var(--dest);border-color:var(--dest);border-radius:3px}
 .rail b{flex:1;width:2px;background:repeating-linear-gradient(var(--muted) 0 3px,transparent 3px 6px);margin-block:4px}
 .pick{display:flex;flex-direction:column;justify-content:center;text-align:left;min-width:0;width:100%;min-height:66px;border:1.5px solid var(--line);background:var(--sunk);border-radius:12px;padding:8px 14px}
 .pick small{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -59,7 +60,7 @@ button{cursor:pointer}
 .chipbtn{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:10px 14px;font-size:15px;font-weight:600}
 .chipbtn svg{width:18px;height:18px}
 .note{font-size:14px;color:var(--muted);margin:0}
-.note.err{color:var(--accent)}
+.note.err{color:var(--dest)}
 
 .when{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1.5px solid var(--line);background:transparent;border-radius:12px;padding:11px 14px}
 .when svg{width:22px;height:22px;flex:none}
@@ -77,7 +78,7 @@ button{cursor:pointer}
 .tag.alt{background:var(--sunk);color:var(--ink)}
 .meta .cost b{color:var(--ink);font-size:16px}
 .pick-pin{position:absolute;left:50%;top:50%;z-index:900;pointer-events:none;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center}
-.pick-pin i{width:3px;height:14px;background:#B3122B}
+.pick-pin i{width:3px;height:14px;background:#D9694F}
 .modal{position:fixed;inset:0;z-index:2200;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
 .modal-card{width:100%;max-width:560px;background:var(--surface);border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column}
 .modal-card h3{margin:0 0 8px;font-family:var(--f-display);font-size:22px}
@@ -153,13 +154,13 @@ button{cursor:pointer}
 
 /* Marcadores */
 .me-icon{width:44px;height:44px;position:relative}
-.me-icon .halo{position:absolute;inset:0;border-radius:50%;background:rgba(179,18,43,.18)}
-.me-icon .dot{position:absolute;inset:6px;border-radius:50%;background:#B3122B;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:grid;place-items:center}
+.me-icon .halo{position:absolute;inset:0;border-radius:50%;background:rgba(43,127,119,.22)}
+.me-icon .dot{position:absolute;inset:6px;border-radius:50%;background:#2B7F77;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:grid;place-items:center}
 .me-icon svg{width:20px;height:20px}
-.me-icon .cone{position:absolute;left:50%;top:-14px;width:0;height:0;margin-left:-9px;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:16px solid rgba(179,18,43,.55);transform-origin:9px 36px}
+.me-icon .cone{position:absolute;left:50%;top:-14px;width:0;height:0;margin-left:-9px;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:16px solid rgba(43,127,119,.55);transform-origin:9px 36px}
 @media (prefers-reduced-motion:no-preference){.me-icon .halo{animation:pulse 2s ease-out infinite}}
 @keyframes pulse{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.5);opacity:0}}
-.pin-end{width:26px;height:26px;border-radius:7px;background:#B3122B;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.pin-end{width:26px;height:26px;border-radius:7px;background:#D9694F;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .pin-start{width:22px;height:22px;border-radius:50%;background:#fff;border:5px solid #16191A;box-shadow:0 2px 6px rgba(0,0,0,.3)}
 .pin-label{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-weight:700;font-size:12px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 
@@ -259,8 +260,8 @@ button{cursor:pointer}
 <div class="app">
   <header class="top">
     <div class="brand">
-      <div class="mark" aria-hidden="true">P</div>
-      <div><h1>Paradero</h1><small>TransMilenio y SITP · Bogotá</small></div>
+      <svg class="mark" viewBox="20 18 68 68" aria-hidden="true"><rect x="20" y="18" width="68" height="68" fill="#3A9E93"/><path fill="#fff" d="M35.5,30.5 H72.5 A4.5,4.5 0 0 1 72.5,39.5 H35.5 A4.5,4.5 0 0 1 35.5,30.5 Z M49.5,35 H58.5 V55 H49.5 Z M54,79 C48.5,71.5 43,66 43,59.5 A11,11 0 1 1 65,59.5 C65,66 59.5,71.5 54,79 Z"/><circle cx="54" cy="59.5" r="4.4" fill="#3A9E93"/><circle cx="35.5" cy="35" r="3.2" fill="#F5C36B"/><circle cx="72.5" cy="35" r="3.2" fill="#F5C36B"/></svg>
+      <div><h1>Trans<span>ub</span></h1><small>TransMilenio y SITP · Bogotá</small></div>
     </div>
     <div class="clock"><b id="daytype"></b><span id="clock"></span></div>
   </header>

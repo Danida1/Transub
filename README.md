@@ -1,4 +1,4 @@
-# Paradero
+# Transub
 
 App Android para buscar la ruta más rápida en TransMilenio y SITP en Bogotá, sin anuncios.
 
@@ -6,6 +6,7 @@ App Android para buscar la ruta más rápida en TransMilenio y SITP en Bogotá, 
 - Usa el GPS del teléfono como punto de partida si das el permiso.
 - Rutas con todas las troncales, alimentadores y rutas SITP del GTFS oficial de Bogotá (SIMUR).
 - Muestra tiempo total, hora de llegada, transbordos, frecuencia de cada ruta y el recorrido en el mapa.
+- Recibe lugares compartidos desde Google Maps (Compartir > Transub) y los pone como destino.
 - Pestaña Novedades con los canales oficiales de TransMilenio (WhatsApp, X y Facebook).
 
 ## Cómo obtener la APK (sin instalar nada)
@@ -15,7 +16,7 @@ App Android para buscar la ruta más rápida en TransMilenio y SITP en Bogotá, 
    La carpeta `.github` está oculta en algunos computadores. Si no se sube, créala a mano con
    **Add file > Create new file**, escribe `.github/workflows/build.yml` como nombre y pega el contenido del archivo.
 3. Entra a la pestaña **Actions**. La compilación empieza sola y tarda entre 5 y 10 minutos.
-4. Cuando termine, ve a **Releases** (columna derecha de la página del repositorio) y descarga `Paradero.apk` desde el teléfono.
+4. Cuando termine, ve a **Releases** (columna derecha de la página del repositorio) y descarga `Transub.apk` desde el teléfono.
 5. Ábrela. Android pedirá permitir la instalación de apps de origen desconocido para el navegador; acéptalo solo para esto.
 
 Cada mes la APK se vuelve a compilar con el GTFS más reciente. También puedes forzarlo en **Actions > Construir APK > Run workflow**.

@@ -92,7 +92,7 @@
       const d = l.c.map(p => xy(p).map(v => v.toFixed(1)).join(",")).join(" ");
       h += `<polyline points="${d}" fill="none" stroke="${l.color}" stroke-width="${l.dash ? 2 : 5}" ${l.dash ? 'stroke-dasharray="2 5"' : ""} stroke-linecap="round" stroke-linejoin="round"/>`;
     }
-    for (const m of marks) { const [x, y] = xy(m.p); h += m.end ? `<rect x="${x - 7}" y="${y - 7}" width="14" height="14" rx="3" fill="${css("--accent")}"/>` : `<circle cx="${x}" cy="${y}" r="7" fill="${css("--surface")}" stroke="${css("--ink")}" stroke-width="3"/>`; }
+    for (const m of marks) { const [x, y] = xy(m.p); h += m.end ? `<rect x="${x - 7}" y="${y - 7}" width="14" height="14" rx="3" fill="${css("--dest")}"/>` : `<circle cx="${x}" cy="${y}" r="7" fill="${css("--surface")}" stroke="${css("--ink")}" stroke-width="3"/>`; }
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Esquema del recorrido">${h}</svg>`;
   }
 
@@ -262,6 +262,61 @@
     if (sheetField === "from" && !dest) setTimeout(() => openSheet("to"), 250);
     else if (origin && dest) run();
   }
+  // ---------- Lugar compartido desde Google Maps ----------
+  // Coordenadas dentro de un enlace o una página de Google Maps
+  function coordsIn(t) {
+    if (!t) return null;
+    t = t.replace(/%2C/gi, ",").replace(/%21/g, "!");
+    const pats = [/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, /[?&](?:q|query|ll|destination|daddr)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/, /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /^geo:(-?\d+\.?\d*),(-?\d+\.?\d*)/, /center=(-?\d+\.\d+),(-?\d+\.\d+)/];
+    if (t.length < 2000) pats.push(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{2,3}\.\d{4,})/);   // "4.6012, -74.0705" escrito en el texto
+    for (const re of pats) {
+      const m = t.match(re);
+      if (m) { const p = { lat: +m[1], lng: +m[2] }; if (p.lat || p.lng) return p; }
+    }
+    // Estado inicial de la página de Maps: [[[zoom, lng, lat]
+    const m = t.match(/APP_INITIALIZATION_STATE=\[\[\[(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)\]/);
+    if (m) return { lat: +m[3], lng: +m[2] };
+    return null;
+  }
+  async function handleShared(text) {
+    if (!text) return;
+    tab("rutas"); closeAllSheets();
+    note("Abriendo el lugar compartido…");
+    const urlM = text.match(/https?:\/\/\S+/);
+    const lines = text.replace(/https?:\/\/\S+/g, "").split(/\n+/).map(x => x.trim().replace(/^["“]|["”]$/g, "")).filter(Boolean);
+    let name = lines[0] || "", addrLine = lines[1] || "";
+    let at = coordsIn(text), qName = "";
+    const geoQ = text.match(/^geo:[^?]*\?q=([^&]+)/);
+    if (geoQ) {
+      qName = decodeURIComponent(geoQ[1].replace(/\+/g, " "));
+      const inner = coordsIn(qName); if (inner && !(at && (at.lat || at.lng))) at = inner;
+      const label = qName.match(/\(([^)]+)\)/); if (label) name = label[1]; else if (!name && !inner) name = qName;
+    }
+    if (at && !at.lat && !at.lng) at = null;
+    if (!at && urlM) {
+      try {
+        const r = await P.resolveMaps(urlM[0]);
+        at = coordsIn(r.url) || coordsIn(r.body);
+        if (!name) { const pm = r.url.match(/\/maps\/place\/([^/@]+)/); if (pm) name = decodeURIComponent(pm[1].replace(/\+/g, " ")); }
+      } catch (e) { /* sin internet o enlace desconocido */ }
+    }
+    if (!at && (addrLine || name || qName)) {   // último recurso: buscar la dirección o el nombre
+      const a = Geo.parseAddress(addrLine) || Geo.parseAddress(name) || Geo.parseAddress(qName);
+      if (a) at = a;
+      else { const r = await Geo.searchOnline([name, addrLine].filter(Boolean).join(" ") || qName, gps.pos || null); if (r.length) at = r[0]; }
+    }
+    if (!at || !Geo.inBogota(at)) { note("No pudimos leer la ubicación compartida. Intenta compartir el lugar de nuevo desde Google Maps o márcalo en el mapa.", true); return; }
+    const place = { name: (name || "Lugar compartido").slice(0, 80), lat: at.lat, lng: at.lng, kind: "Compartido desde Maps", ic: "pin" };
+    const recent = store.get("places", []).filter(r => r.name !== place.name); recent.unshift(place); store.set("places", recent.slice(0, 12));
+    setPlace("to", place); note("");
+    if (!origin) useGps("from"); else run();
+  }
+  function closeAllSheets() { ["sheet", "picker", "whenSheet", "lpage", "nav"].forEach(id => { if (!$(id).hidden) { $(id).hidden = true; } }); }
+  function checkShared() { try { if (window.Android && Android.takeShared) { const t = Android.takeShared(); if (t) handleShared(t); } } catch (e) {} }
+  window.__sharedPing = () => { if (P.net) checkShared(); };
+  window.addEventListener("network", checkShared);
+
   // ---------- Elegir un punto en el mapa ----------
   let pkMap = null, pkTimer = null, pkPlace = null;
   function openPicker() {
@@ -314,7 +369,7 @@
     const off = onGps((pos, err) => {
       off();
       if (pos) apply(pos);
-      else note(err && err.code === 1 ? "Permiso de ubicación negado. Actívalo en Ajustes > Apps > Paradero > Permisos." : "No se pudo leer el GPS. Revisa que la ubicación esté activa.", true);
+      else note(err && err.code === 1 ? "Permiso de ubicación negado. Actívalo en Ajustes > Apps > Transub > Permisos." : "No se pudo leer el GPS. Revisa que la ubicación esté activa.", true);
     });
   }
 

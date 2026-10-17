@@ -22,6 +22,15 @@
     return fetch(url).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); });
   }
   P.httpGet = httpGet;
+  // Enlace corto de Google Maps -> { url final, inicio de la página }
+  P.resolveMaps = function (url) {
+    if (!(window.Android && Android.resolveMaps)) return Promise.reject(new Error("solo en la app"));
+    return new Promise((res, rej) => {
+      const id = ++seq; pending[id] = { res: t => res(JSON.parse(t)), rej };
+      Android.resolveMaps(id, url);
+      setTimeout(() => { if (pending[id]) { delete pending[id]; rej(new Error("timeout")); } }, 20000);
+    });
+  };
 
   const DIR = { left: "a la izquierda", right: "a la derecha", "slight left": "levemente a la izquierda", "slight right": "levemente a la derecha",
     "sharp left": "fuerte a la izquierda", "sharp right": "fuerte a la derecha", uturn: "en U", straight: "derecho" };

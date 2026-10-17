@@ -22,6 +22,10 @@
     stop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22V3"/><rect x="8" y="3" width="11" height="8" rx="2"/></svg>',
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 21V9l8-6 8 6v12z"/><path d="M10 21v-6h4v6"/></svg>',
     map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>',
+    work: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18"/></svg>',
+    school: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/></svg>',
+    gym: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     walker: '<svg viewBox="0 0 24 24" fill="#fff"><circle cx="13" cy="3.6" r="2.2"/><path d="M10.6 7.2l3-.6c.9-.2 1.7.3 2.1 1.1l1.2 2.8 2.4 1.1-.8 1.6-3-1.4-.8-1.7-.9 3.6 2.2 2.5.6 5.6h-1.9l-.5-4.8-2.4-2.3-.9 3.5-3.7 3.9-1.3-1.3 3.2-3.5 1.6-6.5-1.6.7-1 3h-1.9l1.3-4.2z"/></svg>',
     go: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l7 19-7-4-7 4z"/></svg>',
@@ -183,8 +187,8 @@
   }
   function openSheet(which) {
     sheetField = which;
-    $("sq-label").textContent = which === "from" ? "Desde" : "Hacia";
-    const cur = which === "from" ? origin : dest;
+    $("sq-label").textContent = which === "from" ? "Desde" : which === "fav" ? "Lugar del favorito" : "Hacia";
+    const cur = which === "from" ? origin : which === "fav" ? null : dest;
     $("sq").value = cur && cur.name !== "Mi ubicación" ? cur.name : "";
     $("sq").placeholder = which === "from" ? "Dirección, estación o lugar" : "Ej: Calle 72 # 10-34";
     $("sheet").hidden = false;
@@ -210,8 +214,13 @@
     const gpsItem = { name: "Mi ubicación", kind: "GPS", ic: "gps", sub: gps.pos ? "Precisión aprox. " + Math.round(gps.pos.acc) + " m" : "Usar el GPS del teléfono" };
     const mapItem = { name: "Elegir en el mapa", kind: "MAP", ic: "map", sub: "Mueve el mapa y marca el punto exacto" };
     if (!q) {
-      items.push(gpsItem); html += rowHtml(gpsItem, 0);
+      if (sheetField !== "fav") { items.push(gpsItem); html += rowHtml(gpsItem, 0); }
       html += rowHtml(mapItem, items.length); items.push(mapItem);
+      const favs = sheetField === "fav" ? [] : getFavs();
+      if (favs.length) {
+        html += '<div class="grp">Favoritos</div>';
+        favs.forEach(f => { const p = Object.assign({}, f.place, { name: f.name, sub: f.place.name, ic: favIcon(f.name), fav: true }); html += rowHtml(p, items.length); items.push(p); });
+      }
       const recent = store.get("places", []).slice(0, 6);
       if (recent.length) {
         html += '<div class="grp">Recientes</div>';
@@ -255,6 +264,7 @@
     if (p.kind === "GPS") { useGps(sheetField); closeSheet(); return; }
     if (p.kind === "MAP") { openPicker(); return; }
     const clean = { name: p.name, lat: p.lat, lng: p.lng, kind: p.kind, approx: p.approx, ic: p.ic };
+    if (sheetField === "fav") { favDraft.place = clean; closeSheet(); setTimeout(renderFavModal, 200); return; }
     const recent = store.get("places", []).filter(r => r.name !== clean.name);
     recent.unshift(clean); store.set("places", recent.slice(0, 12));
     setPlace(sheetField, clean);
@@ -382,11 +392,97 @@
     if (Router.hav(origin.lat, origin.lng, dest.lat, dest.lng) < 120) { note("El origen y el destino están en el mismo punto.", true); return; }
     note(origin.approx || dest.approx ? "Las direcciones se ubican de forma aproximada según la cuadrícula de calles y carreras." : "");
     $("results").innerHTML = '<div class="loading"><div class="spin"></div>Calculando rutas en servicio…</div>';
+    saveRecentTrip(origin, dest);
     setTimeout(() => {
       options = P.net.plan(origin, dest, planWhen || new Date(), personal()); selected = -1;
       renderResults(); drawPreview();
     }, 30);
   }
+
+  // ---------- Viajes recientes (máximo 3) ----------
+  const placeKey = p => p.gps ? "gps" : p.name + "@" + p.lat.toFixed(4) + "," + p.lng.toFixed(4);
+  function saveRecentTrip(o, d) {
+    const keep = x => ({ name: x.name, lat: x.lat, lng: x.lng, kind: x.kind, approx: x.approx, ic: x.ic, gps: !!x.gps });
+    const key = placeKey(o) + ">" + placeKey(d);
+    const list = store.get("trips", []).filter(t => t.key !== key);
+    list.unshift({ key, o: keep(o), d: keep(d), t: Date.now() });
+    store.set("trips", list.slice(0, 3));
+    renderHome();
+  }
+  function goTrip(t) {
+    setPlace("to", t.d);
+    if (t.o.gps) useGps("from");
+    else { setPlace("from", t.o); run(); }
+  }
+
+  // ---------- Favoritos (Casa, Trabajo…) ----------
+  const getFavs = () => store.get("favs", []);
+  function favIcon(name) {
+    const n = Geo.norm(name || "");
+    if (/casa|hogar|apartamento|apto/.test(n)) return "home";
+    if (/trabajo|oficina|empresa/.test(n)) return "work";
+    if (/universidad|\bu\b|colegio|estudio|clase|sena/.test(n)) return "school";
+    if (/gym|gimnasio/.test(n)) return "gym";
+    return "star";
+  }
+  function goFav(f) {
+    setPlace("to", Object.assign({}, f.place, { name: f.name }));
+    if (!origin) useGps("from"); else run();
+  }
+  let favDraft = { idx: -1, name: "", place: null }, favEditing = false;
+  function openFav(idx) {
+    const f = idx >= 0 ? getFavs()[idx] : null;
+    favDraft = { idx, name: f ? f.name : "", place: f ? f.place : null };
+    $("fav-name").value = favDraft.name;
+    $("favSheet").hidden = false;
+    pushLayer(() => { $("favSheet").hidden = true; });
+    renderFavModal();
+  }
+  function renderFavModal() {
+    if ($("favSheet").hidden) { $("favSheet").hidden = false; pushLayer(() => { $("favSheet").hidden = true; }); }
+    $("fav-title").textContent = favDraft.idx >= 0 ? "Editar favorito" : "Nuevo favorito";
+    const span = $("fav-place").querySelector("span");
+    span.textContent = favDraft.place ? favDraft.place.name : "Toca para elegir dirección, estación o punto en el mapa";
+    span.className = favDraft.place ? "" : "ph";
+    $("fav-del").hidden = favDraft.idx < 0;
+    $("fav-msg").hidden = true;
+  }
+  $("fav-quick").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { $("fav-name").value = b.textContent; favDraft.name = b.textContent; } });
+  $("fav-name").addEventListener("input", () => favDraft.name = $("fav-name").value);
+  $("fav-place").addEventListener("click", () => { favDraft.name = $("fav-name").value; popLayer(); setTimeout(() => openSheet("fav"), 150); });
+  $("fav-save").addEventListener("click", () => {
+    const name = $("fav-name").value.trim();
+    if (!name || !favDraft.place) { $("fav-msg").hidden = false; $("fav-msg").textContent = !name ? "Escribe un nombre, por ejemplo Casa." : "Elige la dirección o el lugar."; return; }
+    const list = getFavs(), item = { name: name.slice(0, 30), place: favDraft.place };
+    if (favDraft.idx >= 0) list[favDraft.idx] = item; else list.push(item);
+    store.set("favs", list.slice(0, 12));
+    popLayer(); renderHome();
+  });
+  $("fav-del").addEventListener("click", () => {
+    const list = getFavs(); list.splice(favDraft.idx, 1); store.set("favs", list);
+    popLayer(); renderHome();
+  });
+
+  // Inicio de Rutas: favoritos y viajes recientes
+  function renderHome() {
+    const favs = getFavs();
+    $("favedit").hidden = !favs.length;
+    $("favedit").textContent = favEditing ? "Listo" : "Editar";
+    $("favs").innerHTML = favs.map((f, i) => `<button class="fav ${favEditing ? "editing" : ""}" data-i="${i}"><span class="fic">${ICON[favIcon(f.name)]}</span><span class="ftx"><b>${esc(f.name)}</b><small>${esc(favEditing ? "Toca para editar" : f.place.name)}</small></span></button>`).join("") +
+      `<button class="fav add" id="favadd"><span class="fic">+</span><span class="ftx"><b>Agregar</b><small>Casa, trabajo…</small></span></button>`;
+    const trips = store.get("trips", []);
+    $("recents-h").hidden = !trips.length;
+    $("recents").innerHTML = trips.map((t, i) => `<button class="rtrip" data-i="${i}"><span class="rline" aria-hidden="true"><i></i><b></b><i class="end"></i></span><span class="rtx"><span>${esc(t.o.gps ? "Mi ubicación" : t.o.name)}</span><span>${esc(t.d.name)}</span></span><span class="rgo">${ICON.arrow}</span></button>`).join("");
+  }
+  $("favs").addEventListener("click", e => {
+    const b = e.target.closest(".fav"); if (!b) return;
+    if (b.id === "favadd") { openFav(-1); return; }
+    const i = +b.dataset.i;
+    if (favEditing) openFav(i); else goFav(getFavs()[i]);
+  });
+  $("favedit").addEventListener("click", () => { favEditing = !favEditing; renderHome(); });
+  $("recents").addEventListener("click", e => { const b = e.target.closest(".rtrip"); if (b) goTrip(store.get("trips", [])[+b.dataset.i]); });
+  renderHome();
   $("form").addEventListener("submit", e => { e.preventDefault(); run(); });
   $("swap").addEventListener("click", () => {
     const o = origin, d = dest; setPlace("from", d); setPlace("to", o);

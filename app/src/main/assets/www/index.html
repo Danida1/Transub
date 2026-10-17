@@ -79,6 +79,30 @@ button{cursor:pointer}
 .meta .cost b{color:var(--ink);font-size:16px}
 .pick-pin{position:absolute;left:50%;top:50%;z-index:900;pointer-events:none;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center}
 .pick-pin i{width:3px;height:14px;background:#D9694F}
+.home{display:flex;flex-direction:column;gap:10px}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:700;font-size:15px;padding:4px}
+.favs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.fav{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:10px 12px;min-width:0}
+.fav .fic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 16%,transparent);color:var(--accent);flex:none;font-size:22px;font-weight:600}
+.fav .fic svg{width:20px;height:20px}
+.fav .ftx{min-width:0}
+.fav b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fav small{display:block;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fav.add{border-style:dashed;background:transparent}
+.fav.editing{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.recents{display:flex;flex-direction:column;gap:8px}
+.rtrip{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:10px 14px}
+.rline{display:flex;flex-direction:column;align-items:center;align-self:stretch;padding-block:6px}
+.rline i{width:8px;height:8px;border-radius:50%;border:2px solid var(--ink);flex:none}
+.rline i.end{background:var(--dest);border-color:var(--dest);border-radius:2px}
+.rline b{flex:1;width:2px;background:repeating-linear-gradient(var(--muted) 0 2px,transparent 2px 4px);margin-block:2px;min-height:8px}
+.rtx{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.rtx span{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtx span:last-child{font-weight:600}
+.rgo{color:var(--muted)}
+.rgo svg{width:18px;height:18px}
+.textin{width:100%;font-size:18px;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--sunk);color:var(--ink);outline:none}
+.textin:focus{border-color:var(--ink);background:var(--surface)}
 .modal{position:fixed;inset:0;z-index:2200;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
 .modal-card{width:100%;max-width:560px;background:var(--surface);border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column}
 .modal-card h3{margin:0 0 8px;font-family:var(--f-display);font-size:22px}
@@ -333,6 +357,13 @@ body.has-trip .obody{padding-bottom:96px!important}
       <p class="note" id="msg" hidden></p>
     </form>
 
+    <div class="home" id="home">
+      <div class="sec-h"><h2>Favoritos</h2><button type="button" class="linkbtn" id="favedit" hidden>Editar</button></div>
+      <div class="favs" id="favs"></div>
+      <div class="sec-h" id="recents-h" hidden><h2>Viajes recientes</h2></div>
+      <div class="recents" id="recents"></div>
+    </div>
+
     <div class="sec-h" id="opth" hidden><h2>Opciones</h2><span id="summary"></span></div>
     <div class="results" id="results">
       <div class="loading"><div class="spin"></div>Cargando la red de TransMilenio y SITP…</div>
@@ -410,6 +441,20 @@ body.has-trip .obody{padding-bottom:96px!important}
   </div>
   <div class="nav-bottom">
     <div class="eta"><div style="min-width:0"><b id="pick-name" style="display:block;font-size:17px">Punto en el mapa</b><small id="pick-sub"></small></div><button class="go" id="pick-ok" style="flex:none;min-width:0">Usar este punto</button></div>
+  </div>
+</div>
+
+<!-- Favorito -->
+<div class="modal" id="favSheet" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="fav-title">
+    <h3 id="fav-title">Nuevo favorito</h3>
+    <div class="grp" style="margin:4px 0 6px">Nombre</div>
+    <input id="fav-name" class="textin" maxlength="30" placeholder="Ej: Casa" autocomplete="off">
+    <div class="chips" id="fav-quick" style="margin-top:8px"><button type="button">Casa</button><button type="button">Trabajo</button><button type="button">Universidad</button><button type="button">Gimnasio</button></div>
+    <div class="grp" style="margin:14px 0 6px">Dirección o lugar</div>
+    <button type="button" class="pick" id="fav-place"><small>Lugar</small><span class="ph">Toca para elegir dirección, estación o punto en el mapa</span></button>
+    <p class="note err" id="fav-msg" hidden style="margin-top:8px"></p>
+    <div class="row" style="margin-top:14px"><button type="button" class="chipbtn" id="fav-del" hidden>Eliminar</button><button type="button" class="go" id="fav-save">Guardar</button></div>
   </div>
 </div>
 

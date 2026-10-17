@@ -12,6 +12,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -60,6 +62,17 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setAllowFileAccess(false);
         s.setMediaPlaybackRequiresUserGesture(true);
+
+        // Puente mínimo: mantener la pantalla encendida durante el modo viaje
+        web.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void keepScreenOn(boolean on) {
+                runOnUiThread(() -> {
+                    if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                });
+            }
+        }, "Android");
 
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .setDomain(HOST)

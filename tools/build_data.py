@@ -98,6 +98,39 @@ def clean_color(c, default):
     return c.upper() if len(c) == 6 else default
 
 
+def schedules(p, daytypes):
+    """Por tipo de día: [primera salida (min), última salida (min), hora inicial, frecuencia por hora en min...].
+    Frecuencia 0 = sin servicio en esa hora. Las horas pueden pasar de 24 (servicio después de medianoche)."""
+    by = defaultdict(list)
+    for a, b, h, svc in p["freq"]:
+        for dt in daytypes.get(svc) or ("L",):
+            t = a
+            while t < b:
+                by[dt].append(t)
+                t += max(h, 60)
+    for dep, svc in p["deps"]:
+        for dt in daytypes.get(svc) or ("L",):
+            by[dt].append(dep)
+    out = {}
+    for dt, deps in by.items():
+        deps = sorted(set(deps))
+        first, last = deps[0], deps[-1]
+        h0, h1 = first // 3600, last // 3600
+        hours = []
+        for h in range(h0, h1 + 1):
+            lo, hi = h * 3600, (h + 1) * 3600
+            gaps = [deps[i + 1] - deps[i] for i in range(len(deps) - 1) if deps[i] < hi and deps[i + 1] > lo]
+            gaps = [g for g in gaps if g <= 150 * 60]  # una pausa larga a media jornada no es servicio
+            if gaps:
+                hours.append(max(1, round(statistics.mean(gaps) / 60)))
+            elif any(lo <= d < hi for d in deps):
+                hours.append(60)
+            else:
+                hours.append(0)
+        out[dt] = [first // 60, last // 60, h0] + hours
+    return out
+
+
 def build(data, source):
     zf = zipfile.ZipFile(io.BytesIO(data))
 
@@ -124,24 +157,45 @@ def build(data, source):
         routes[r["route_id"]] = r
     log("Rutas:", len(routes))
 
-    # --- Servicios de día hábil ---
-    weekday = set()
+    # --- Tipo de día de cada servicio: L (lunes a viernes), S (sábado), D (domingo y festivo) ---
+    daytypes = defaultdict(set)
     cal = reader(zf, "calendar.txt")
     if cal:
         for r in cal:
+            sid = r["service_id"]
             if any(r.get(d) == "1" for d in ("monday", "tuesday", "wednesday", "thursday", "friday")):
-                weekday.add(r["service_id"])
-    if not weekday:
-        cd = reader(zf, "calendar_dates.txt")
-        if cd:
-            from datetime import date
-            for r in cd:
-                try:
-                    d = r["date"]
-                    if r.get("exception_type") == "1" and date(int(d[:4]), int(d[4:6]), int(d[6:])).weekday() < 5:
-                        weekday.add(r["service_id"])
-                except Exception:
-                    pass
+                daytypes[sid].add("L")
+            if r.get("saturday") == "1":
+                daytypes[sid].add("S")
+            if r.get("sunday") == "1":
+                daytypes[sid].add("D")
+    cd = reader(zf, "calendar_dates.txt")
+    if cd:
+        from datetime import date
+        for r in cd:
+            try:
+                d = r["date"]
+                if r.get("exception_type") == "1" and not daytypes.get(r["service_id"]):
+                    wd = date(int(d[:4]), int(d[4:6]), int(d[6:])).weekday()
+                    daytypes[r["service_id"]].add("L" if wd < 5 else "S" if wd == 5 else "D")
+            except Exception:
+                pass
+    weekday = {k for k, v in daytypes.items() if "L" in v}
+    # Festivos: días entre semana en que opera un servicio que solo es de domingo
+    holidays = set()
+    cd = reader(zf, "calendar_dates.txt")
+    if cd:
+        from datetime import date
+        for r in cd:
+            try:
+                d = r["date"]
+                if r.get("exception_type") == "1" and daytypes.get(r["service_id"]) == {"D"} \
+                        and date(int(d[:4]), int(d[4:6]), int(d[6:])).weekday() < 6:
+                    holidays.add(d)
+            except Exception:
+                pass
+    log("Festivos en el calendario:", len(holidays))
+    log("Servicios por tipo de día:", {t: sum(1 for v in daytypes.values() if t in v) for t in "LSD"})
 
     # --- Viajes ---
     trips = {}
@@ -186,9 +240,9 @@ def build(data, source):
         p["trips"] += 1
         dep0 = rows[0][3] if rows[0][3] is not None else rows[0][2]
         if t in freq:
-            p["freq"] += freq[t]
-        elif dep0 is not None and (not weekday or svc in weekday):
-            p["deps"].append(dep0)
+            p["freq"] += [(a, b, h, svc) for a, b, h in freq[t]]
+        elif dep0 is not None:
+            p["deps"].append((dep0, svc))
         if len(p["samples"]) < 40:
             p["samples"].append([(x[2], x[3]) for x in rows])
         if not p["head"] and head:
@@ -214,6 +268,7 @@ def build(data, source):
 
     route_index, route_list = {}, []
     out_pats = []
+    tidy_h = lambda t: " ".join((t or "").replace("||", " – ").split()).strip(" –")
     for (rid, d, seq), p in kept:
         # tiempos entre paradas consecutivas: mediana entre viajes de muestra
         tt = []
@@ -232,25 +287,21 @@ def build(data, source):
                 v = est
             tt.append(max(20, int(round(v))))
         # frecuencia (segundos entre buses)
+        sched = schedules(p, daytypes)
         hw = None
-        if p["freq"]:
-            hs = [h for s, e, h in p["freq"] if e > DAY_START and s < DAY_END] or [h for _, _, h in p["freq"]]
-            hw = statistics.median(hs)
-        else:
-            deps = sorted(x for x in p["deps"] if DAY_START <= x <= DAY_END)
-            if len(deps) >= 2:
-                hw = (deps[-1] - deps[0]) / (len(deps) - 1)
-            elif len(p["deps"]) >= 2:
-                ds = sorted(p["deps"])
-                hw = (ds[-1] - ds[0]) / (len(ds) - 1)
+        main = sched.get("L") or sched.get("S") or sched.get("D")
+        if main:
+            hs = [h for h in main[3:] if h > 0]
+            day = [h for i, h in enumerate(main[3:]) if h > 0 and DAY_START <= (main[2] + i) * 3600 < DAY_END]
+            hw = statistics.median(day or hs) * 60 if (day or hs) else None
         if not hw or hw <= 0:
             hw = 1200
         hw = int(min(max(hw, 90), 3600))
         if rid not in route_index:
             route_index[rid] = len(route_list)
             route_list.append(rid)
-        out_pats.append({"r": route_index[rid], "h": p["head"], "w": hw,
-                         "s": [sidx(x) for x in seq], "t": tt})
+        out_pats.append({"r": route_index[rid], "h": tidy_h(p["head"]), "w": hw,
+                         "s": [sidx(x) for x in seq], "t": tt, "d": sched})
 
     # --- Clasificación de rutas ---
     station_like = set()
@@ -268,6 +319,17 @@ def build(data, source):
     def kind(ri, r):
         txt = " ".join([r.get("route_long_name", ""), r.get("route_desc", ""), agencies.get(r.get("agency_id", ""), "")]).lower()
         rt = r.get("route_type", "3")
+        ag = agencies.get(r.get("agency_id", ""), "").lower()
+        if "cable" in ag:
+            return "C"
+        if "alimentador" in ag:
+            return "A"
+        if "dual" in ag:
+            return "D"
+        if "troncal" in ag:
+            return "T"
+        if "zonal" in ag:
+            return "Z"
         if rt in ("6", "7") or "cable" in txt:
             return "C"
         if "alimentador" in txt:
@@ -280,8 +342,12 @@ def build(data, source):
         return "Z"
 
     out_routes = []
+    def tidy(t):
+        return " ".join((t or "").replace("||", " – ").split()).strip(" –")
+
     for ri, rid in enumerate(route_list):
         r = routes[rid]
+        r["route_long_name"] = tidy(r.get("route_long_name"))
         k = kind(ri, r)
         default = {"T": "B3122B", "A": "1E7A4C", "C": "6D3F9A", "D": "C0682A"}.get(k, "1F7FA8")
         out_routes.append({
@@ -330,7 +396,8 @@ def build(data, source):
         counts[r["k"]] += 1
     log("Rutas por tipo:", dict(counts))
     return {
-        "v": 1,
+        "v": 2,
+        "hol": sorted(holidays),
         "generated": time.strftime("%Y-%m-%d"),
         "source": source,
         "feed": fi,

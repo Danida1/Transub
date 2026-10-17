@@ -25,6 +25,12 @@ jobs:
       - name: Descargar el GTFS oficial (SIMUR) y preparar los datos
         run: python tools/build_data.py
 
+      - name: Descargar el mapa (Leaflet) para que funcione sin depender de internet
+        run: |
+          mkdir -p app/src/main/assets/www/vendor
+          curl -sSfL -o app/src/main/assets/www/vendor/leaflet.js https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
+          curl -sSfL -o app/src/main/assets/www/vendor/leaflet.css https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

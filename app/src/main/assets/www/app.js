@@ -454,48 +454,62 @@
       b.querySelector("[data-first]").addEventListener("click", () => run(first));
       b.querySelector("[data-pick]").addEventListener("click", () => openWhen(first));
       box.appendChild(b);
-      if (!options.length) { $("previewmap").hidden = true; return; }
+      if (!options.length) return;
     }
     const fastest = Math.min(...options.map(o => o.total)), cheapest = Math.min(...options.map(o => o.cost || 0));
     const hint = document.createElement("p"); hint.className = "hintline";
-    hint.textContent = (planWhen ? "Saliendo " + whenText(planWhen).toLowerCase() : "Rutas en servicio ahora") + " · cada vez que validas la tarjeta cuenta como un pasaje de " + money(Router.Network.FARE) + "." + (selected < 0 ? " Toca una opción para ver el paso a paso." : "");
+    hint.textContent = (planWhen ? "Saliendo " + whenText(planWhen).toLowerCase() : "Rutas en servicio ahora") + " · cada vez que validas la tarjeta cuenta como un pasaje de " + money(Router.Network.FARE) + ". Toca una opción para ver el mapa y el paso a paso.";
     box.appendChild(hint);
     options.forEach((op, idx) => {
-      const rides = op.legs.filter(l => l.kind === "ride");
-      const walkM = op.legs.filter(l => l.kind !== "ride").reduce((s, l) => s + (l.meters || 0), 0);
-      const el = document.createElement("div"); el.className = "opt" + (idx === selected ? " sel" : ""); el.tabIndex = 0;
-      const strip = op.legs.filter(l => l.kind !== "xfer" && !(l.kind === "walk" && l.meters < 40)).map(l => {
-        const w = Math.max(l.sec + (l.wait || 0), 90);
-        if (l.kind === "walk") return `<div class="seg walk" style="flex:${w}"></div>`;
-        const r = net.routes[l.route]; return `<div class="seg" style="flex:${w};background:#${r.c};color:#${r.x}">${esc(r.s)}</div>`;
-      }).join("");
       const tag = idx === 0 ? '<span class="tag">Recomendada</span>' : op.total === fastest ? '<span class="tag alt">Más rápida</span>' : (op.cost || 0) === cheapest && (options[0].cost || 0) > cheapest ? '<span class="tag alt">Más barata</span>' : "";
-      let html = `<div class="opt-top"><span class="dur">${durHtml(op.total)}</span><span class="arr">Llegas ${fmtTime(new Date(base.getTime() + op.total * 1000))}</span>${tag}</div>
-        <div class="strip" aria-hidden="true">${strip}</div>
-        <div class="meta"><span class="cost"><b>${money(op.cost || 0)}</b>${op.fares > 1 ? ` · ${op.fares} pasajes` : op.fares === 1 ? " · 1 pasaje" : ""}</span><span><b>${Math.max(0, rides.length - 1)}</b> ${rides.length - 1 === 1 ? "cambio de bus" : "cambios de bus"}</span><span><b>${meters(walkM)}</b> a pie</span>${rides.length ? "" : "<span>Sin bus</span>"}</div>`;
-      if (idx === selected) {
-        html += '<ol class="steps">' + stepsFor(op).map(s => `<li>${s.b}<div class="t">${s.t}<small>${s.s}</small></div><span class="m">${s.m}</span></li>`).join("") + "</ol>";
-        html += `<button class="start" data-start>${ICON.go} Iniciar viaje</button>`;
-      }
-      el.innerHTML = html;
-      el.addEventListener("click", e => {
-        if (e.target.closest("[data-start]")) { P.startNav(op, origin, dest, base); return; }
-        selected = selected === idx ? -1 : idx; renderResults(); drawPreview(); loadWalks();
-      });
+      const el = document.createElement("button"); el.type = "button"; el.className = "opt";
+      el.innerHTML = summaryHtml(op, base, tag) + `<span class="more-l">Ver recorrido y pasos ${ICON.arrow}</span>`;
+      el.addEventListener("click", () => openOption(idx, tag));
       box.appendChild(el);
     });
   }
+
+  function summaryHtml(op, base, tag) {
+    const net = P.net, rides = op.legs.filter(l => l.kind === "ride");
+    const walkM = op.legs.filter(l => l.kind !== "ride").reduce((s, l) => s + (l.walk ? l.walk.dist : l.meters || 0), 0);
+    const strip = op.legs.filter(l => l.kind !== "xfer" && !(l.kind === "walk" && l.meters < 40)).map(l => {
+      const w = Math.max(l.sec + (l.wait || 0), 90);
+      if (l.kind === "walk") return `<div class="seg walk" style="flex:${w}"></div>`;
+      const r = net.routes[l.route]; return `<div class="seg" style="flex:${w};background:#${r.c};color:#${r.x}">${esc(r.s)}</div>`;
+    }).join("");
+    return `<div class="opt-top"><span class="dur">${durHtml(op.total)}</span><span class="arr">Llegas ${fmtTime(new Date(base.getTime() + op.total * 1000))}</span>${tag || ""}</div>
+      <div class="strip" aria-hidden="true">${strip}</div>
+      <div class="meta"><span class="cost"><b>${money(op.cost || 0)}</b>${op.fares > 1 ? ` · ${op.fares} pasajes` : op.fares === 1 ? " · 1 pasaje" : ""}</span><span><b>${Math.max(0, rides.length - 1)}</b> ${rides.length - 1 === 1 ? "cambio de bus" : "cambios de bus"}</span><span><b>${meters(walkM)}</b> a pie</span>${rides.length ? "" : "<span>Sin bus</span>"}</div>`;
+  }
+
+  // ---------- Pantalla de detalle de una opción: mapa grande arriba, pasos abajo ----------
+  let detailTag = "";
+  function openOption(idx, tag) {
+    selected = idx; detailTag = tag;
+    $("opage").hidden = false; $("obody").scrollTop = 0;
+    pushLayer(() => { $("opage").hidden = true; selected = -1; });
+    renderDetail(); drawPreview(); loadWalks();
+  }
+  function renderDetail() {
+    const op = options[selected]; if (!op) return;
+    const base = planWhen || new Date();
+    $("otitle").textContent = `${origin.name} → ${dest.name}`;
+    $("osum").innerHTML = summaryHtml(op, base, detailTag);
+    $("osteps").innerHTML = stepsFor(op).map(s => `<li>${s.b}<div class="t">${s.t}<small>${s.s}</small></div><span class="m">${s.m}</span></li>`).join("");
+  }
+  $("opage-back").addEventListener("click", () => popLayer());
+  $("ostart").addEventListener("click", () => { const op = options[selected]; if (op) P.startNav(op, origin, dest, planWhen || new Date()); });
 
   // Vista previa del recorrido con tu posición
   let pmap = null, player = null, pme = null;
   // Trae las caminatas por la calle de la opción elegida y vuelve a dibujar
   function loadWalks() {
     const op = options[selected]; if (!op) return;
-    P.fetchWalks(op).then(got => { if (got && options[selected] === op) { renderResults(); drawPreview(); } });
+    P.fetchWalks(op).then(got => { if (got && options[selected] === op && !$("opage").hidden) { renderDetail(); drawPreview(); } });
   }
   function drawPreview() {
-    const op = options[selected], el = $("previewmap");
-    el.hidden = !op; if (!op) return;
+    const op = options[selected], el = $("omap");
+    if (!op) return;
     const segs = op.legs.map(l => ({ l, c: P.legCoords(l) }));
     if (!window.L) {
       P.drawSvg(el, segs.map(s => ({ c: s.c, color: s.l.kind === "ride" ? "#" + P.net.routes[s.l.route].c : css("--ink"), dash: s.l.kind !== "ride" })),

@@ -52,11 +52,7 @@
         L.polyline(c, { color: "#16191A", weight: 5, dashArray: "1 9", lineCap: "round" }).addTo(layer);
       }
     }
-    for (const { l } of trip.legs) if (l.kind === "ride") {
-      const col = "#" + net.routes[l.route].c;
-      L.circleMarker([net.lat[l.from], net.lng[l.from]], { radius: 8, color: col, weight: 4, fillColor: "#fff", fillOpacity: 1 }).bindTooltip("Sube: " + net.name[l.from], { className: "pin-label" }).addTo(layer);
-      L.circleMarker([net.lat[l.to], net.lng[l.to]], { radius: 8, color: col, weight: 4, fillColor: "#fff", fillOpacity: 1 }).bindTooltip("Baja: " + net.name[l.to], { className: "pin-label" }).addTo(layer);
-    }
+    for (const { l } of trip.legs) if (l.kind === "ride") P.stopDots(layer, l.pat, l.bpos, l.apos);
     P.endMarker([dest.lat, dest.lng], dest.name.length > 26 ? dest.name.slice(0, 25) + "…" : dest.name).addTo(layer);
     if (!origin.gps) P.startMarker([origin.lat, origin.lng]).addTo(layer);
     map.invalidateSize();

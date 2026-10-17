@@ -127,7 +127,7 @@
     lmap = P.makeMap(el); llayer = L.layerGroup().addTo(lmap);
     L.polyline(c, { color: "#fff", weight: 9, opacity: .9 }).addTo(llayer);
     L.polyline(c, { color: col, weight: 6 }).addTo(llayer);
-    c.forEach((pt, i) => { if (i && i < c.length - 1) L.circleMarker(pt, { radius: 3, color: col, weight: 2, fillColor: "#fff", fillOpacity: 1 }).bindTooltip(net.name[net.pats[pi].s[i]]).addTo(llayer); });
+    P.stopDots(llayer, pi);
     P.startMarker(c[0], "Inicio: " + first).addTo(llayer);
     P.endMarker(c[c.length - 1], "Final: " + last).addTo(llayer);
     if (P.gps.pos) P.meMarker([P.gps.pos.lat, P.gps.pos.lng]).addTo(llayer);

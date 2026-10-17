@@ -98,11 +98,22 @@
   function kindLabel(r) { return { T: "TransMilenio", A: "Alimentador", C: "TransMiCable", D: "Dual", Z: "SITP" }[r.k] || "SITP"; }
   function badgeHtml(r) { return `<span class="badge" style="background:#${r.c};color:#${r.x}">${esc(r.s || kindLabel(r))}</span>`; }
 
-  const P = window.P = { $, css, esc, fmtTime, fmtMin, fmtDur, durHtml, meters, store, ICON, pushLayer, popLayer, gps, startGps, onGps,
+  // Puntos blancos en las paradas donde el bus se detiene (los extremos más grandes)
+  function stopDots(layer, pi, a, b) {
+    const net = P.net, p = net.pats[pi], col = "#" + net.routes[p.r].c;
+    a = a || 0; b = b === undefined ? p.s.length - 1 : b;
+    for (let i = a; i <= b; i++) {
+      const s = p.s[i], end = i === a || i === b;
+      L.circleMarker([net.lat[s], net.lng[s]], { radius: end ? 7 : 4, color: end ? col : "#16191A", weight: end ? 3.5 : 2, fillColor: "#fff", fillOpacity: 1 })
+        .bindTooltip(net.name[s], { className: "pin-label" }).addTo(layer);
+    }
+  }
+
+  const P = window.P = { stopDots, $, css, esc, fmtTime, fmtMin, fmtDur, durHtml, meters, store, ICON, pushLayer, popLayer, gps, startGps, onGps,
     leafletReady, makeMap, meMarker, setHeading, endMarker, startMarker, drawSvg, kindLabel, badgeHtml, net: null };
 
   // ---------- Carga de la red ----------
-  let origin = null, dest = null, options = [], selected = 0, searchIndex = [], planWhen = null;
+  let origin = null, dest = null, options = [], selected = -1, searchIndex = [], planWhen = null;
 
   async function load() {
     try {
@@ -270,14 +281,15 @@
   // ---------- Buscar ----------
   function run(when) {
     if (!P.net) return;
+    if (when !== undefined) setWhen(when);
+    if (planWhen && planWhen < new Date(Date.now() - 5 * 60000)) setWhen(null);   // una hora programada que ya pasó
     if (!origin || !dest) { note("Elige el origen y el destino.", true); return; }
     if (Router.hav(origin.lat, origin.lng, dest.lat, dest.lng) < 120) { note("El origen y el destino están en el mismo punto.", true); return; }
     note(origin.approx || dest.approx ? "Las direcciones se ubican de forma aproximada según la cuadrícula de calles y carreras." : "");
-    planWhen = when || null;
     $("results").innerHTML = '<div class="loading"><div class="spin"></div>Calculando rutas en servicio…</div>';
     setTimeout(() => {
-      options = P.net.plan(origin, dest, planWhen || new Date()); selected = 0;
-      renderResults(); drawPreview(); loadWalks();
+      options = P.net.plan(origin, dest, planWhen || new Date()); selected = -1;
+      renderResults(); drawPreview();
     }, 30);
   }
   $("form").addEventListener("submit", e => { e.preventDefault(); run(); });
@@ -321,16 +333,24 @@
     $("opth").hidden = false;
     $("summary").textContent = `${origin.name} → ${dest.name}`;
     box.innerHTML = "";
-    if (!options.length) {
-      $("previewmap").hidden = true;
-      const t = net.when, late = t.getHours() >= 21 || t.getHours() < 5;
-      box.innerHTML = `<div class="empty"><span>${late ? "A esta hora no hay rutas en servicio que conecten estos puntos." : "No encontramos una ruta en servicio entre esos puntos. Prueba con un punto más cercano a una vía principal."}</span>${late ? '<button class="chipbtn" id="tomorrow">' + ICON.clock + " Ver rutas para salir a las 5:00 a. m.</button>" : ""}</div>`;
-      const tb = $("tomorrow");
-      if (tb) tb.addEventListener("click", () => { const d = new Date(); if (d.getHours() >= 5) d.setDate(d.getDate() + 1); d.setHours(5, 0, 0, 0); run(d); });
-      return;
+    const base = planWhen || new Date(), h = base.getHours(), night = h >= 22 || h < 4 || (h === 4 && base.getMinutes() < 30);
+    if (!options.length || (night && !planWhen)) {
+      // Casi no hay buses: ofrecer programar el viaje
+      const first = new Date(); if (first.getHours() >= 4) first.setDate(first.getDate() + 1); first.setHours(5, 0, 0, 0);
+      const firstLabel = (first.getDate() === new Date().getDate() ? "Hoy" : "Mañana") + " a las 5:00 a. m.";
+      const b = document.createElement("div"); b.className = "banner";
+      b.innerHTML = `<b>${options.length ? "A esta hora casi no hay buses." : "A esta hora no hay rutas en servicio entre estos puntos."}</b>
+        <span class="hintline">Programa tu viaje para ver la mejor ruta cuando vuelvan a operar.</span>
+        <div class="row"><button class="chipbtn" data-first>${ICON.clock} ${firstLabel}</button><button class="chipbtn" data-pick>Elegir día y hora</button></div>`;
+      b.querySelector("[data-first]").addEventListener("click", () => run(first));
+      b.querySelector("[data-pick]").addEventListener("click", () => openWhen(first));
+      box.appendChild(b);
+      if (!options.length) { $("previewmap").hidden = true; return; }
     }
-    const base = planWhen || new Date(), fastest = Math.min(...options.map(o => o.total));
-    if (planWhen) { const n = document.createElement("p"); n.className = "note"; n.textContent = "Rutas para salir a las " + fmtTime(planWhen) + (planWhen.getDate() !== new Date().getDate() ? " de mañana" : "") + "."; box.appendChild(n); }
+    const fastest = Math.min(...options.map(o => o.total));
+    const hint = document.createElement("p"); hint.className = "hintline";
+    hint.textContent = (planWhen ? "Saliendo " + whenText(planWhen).toLowerCase() + ". " : "Rutas en servicio ahora. ") + (selected < 0 ? "Toca una opción para ver el paso a paso." : "");
+    box.appendChild(hint);
     options.forEach((op, idx) => {
       const rides = op.legs.filter(l => l.kind === "ride");
       const walkM = op.legs.filter(l => l.kind !== "ride").reduce((s, l) => s + (l.meters || 0), 0);
@@ -351,7 +371,7 @@
       el.innerHTML = html;
       el.addEventListener("click", e => {
         if (e.target.closest("[data-start]")) { P.startNav(op, origin, dest, base); return; }
-        if (selected !== idx) { selected = idx; renderResults(); drawPreview(); loadWalks(); }
+        selected = selected === idx ? -1 : idx; renderResults(); drawPreview(); loadWalks();
       });
       box.appendChild(el);
     });
@@ -380,14 +400,61 @@
       if (l.kind === "ride") L.polyline(c, { color: "#" + P.net.routes[l.route].c, weight: 6, opacity: .92 }).addTo(player);
       else { L.polyline(c, { color: "#fff", weight: 7, opacity: .85 }).addTo(player); L.polyline(c, { color: "#16191A", weight: 4, dashArray: "1 8", lineCap: "round" }).addTo(player); }
     }
-    for (const { l } of segs) if (l.kind === "ride") for (const s of [l.from, l.to])
-      L.circleMarker([P.net.lat[s], P.net.lng[s]], { radius: 6, color: "#" + P.net.routes[l.route].c, weight: 3, fillColor: "#fff", fillOpacity: 1 }).bindTooltip(P.net.name[s]).addTo(player);
+    for (const { l } of segs) if (l.kind === "ride") P.stopDots(player, l.pat, l.bpos, l.apos);
     if (origin.gps && gps.pos) { pme = meMarker([gps.pos.lat, gps.pos.lng]).addTo(player); }
     else startMarker([origin.lat, origin.lng]).addTo(player);
     endMarker([dest.lat, dest.lng]).addTo(player);
     setTimeout(() => { pmap.invalidateSize(); pmap.fitBounds(L.latLngBounds(all).pad(0.12)); }, 60);
   }
   onGps(pos => { if (pos && pme) pme.setLatLng([pos.lat, pos.lng]); });
+
+  // ---------- Programar viaje ----------
+  const WD = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const MO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const dayDiff = d => { const a = new Date(); a.setHours(0, 0, 0, 0); const b = new Date(d); b.setHours(0, 0, 0, 0); return Math.round((b - a) / 864e5); };
+  function dayName(d) { const n = dayDiff(d); return n === 0 ? "Hoy" : n === 1 ? "Mañana" : n === 2 ? "Pasado mañana" : WD[d.getDay()].replace(/^./, c => c.toUpperCase()) + " " + d.getDate(); }
+  function whenText(d) { return dayName(d) + " a las " + fmtTime(d); }
+  function dayTypeText(d) {
+    if (!P.net) return "";
+    const t = P.net.dayType(d), key = Router.ymd(d);
+    if (t === "D" && d.getDay() !== 0) return "Festivo (horario de domingo)";
+    return { L: "Día hábil", S: "Sábado", D: "Domingo" }[t];
+  }
+  function setWhen(d) {
+    planWhen = d ? new Date(d) : null;
+    $("when").classList.toggle("on", !!planWhen);
+    $("when-text").textContent = planWhen ? "Salir " + whenText(planWhen).replace(/^./, c => c.toLowerCase()) : "Salir ahora";
+    $("when-day").textContent = planWhen ? dayTypeText(planWhen) : "";
+  }
+  let wDay = 0;
+  function openWhen(preset) {
+    const base = preset || planWhen || (() => { const d = new Date(); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0); return d; })();
+    wDay = Math.max(0, dayDiff(base));
+    $("wtime").value = String(base.getHours()).padStart(2, "0") + ":" + String(base.getMinutes()).padStart(2, "0");
+    renderWhen();
+    $("whenSheet").hidden = false;
+    pushLayer(() => { $("whenSheet").hidden = true; });
+  }
+  function draftDate() {
+    const [hh, mm] = ($("wtime").value || "06:00").split(":").map(Number);
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + wDay); d.setHours(hh, mm, 0, 0); return d;
+  }
+  function renderWhen() {
+    let html = "";
+    for (let i = 0; i < 7; i++) { const d = new Date(); d.setDate(d.getDate() + i); html += `<button type="button" data-d="${i}" class="${i === wDay ? "on" : ""}">${dayName(d)}</button>`; }
+    $("wdays").innerHTML = html;
+    $("wquick").innerHTML = [[5, 0], [6, 0], [7, 0], [12, 0], [17, 0], [18, 0]].map(([h, m]) => `<button type="button" data-t="${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}">${fmtMin(h * 60 + m)}</button>`).join("");
+    const d = draftDate();
+    $("wdesc").innerHTML = `<b>${WD[d.getDay()].replace(/^./, c => c.toUpperCase())} ${d.getDate()} de ${MO[d.getMonth()]}</b>, saliendo a las <b>${fmtTime(d)}</b> · ${esc(dayTypeText(d))}${d < new Date(Date.now() - 60000) ? '<br><span style="color:var(--accent)">Esa hora ya pasó: elige una hora futura.</span>' : ""}`;
+    $("wok").disabled = d < new Date(Date.now() - 60000);
+  }
+  $("when").addEventListener("click", () => openWhen());
+  $("wdays").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { wDay = +b.dataset.d; renderWhen(); } });
+  $("wquick").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { $("wtime").value = b.dataset.t; renderWhen(); } });
+  $("wtime").addEventListener("input", renderWhen);
+  $("wok").addEventListener("click", () => { const d = draftDate(); popLayer(); setWhen(d); if (origin && dest) run(); });
+  $("wnow").addEventListener("click", () => { popLayer(); setWhen(null); if (origin && dest) run(); });
+  $("whenSheet").addEventListener("click", e => { if (e.target.id === "whenSheet") popLayer(); });
 
   // ---------- Pestañas ----------
   function tab(which) {

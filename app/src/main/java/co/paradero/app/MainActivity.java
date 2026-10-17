@@ -110,6 +110,21 @@ public class MainActivity extends Activity {
                 });
             }
 
+            // Abre la app oficial de X; si no está instalada, el navegador
+            @JavascriptInterface
+            public void openXApp(String url) {
+                runOnUiThread(() -> {
+                    Uri u = Uri.parse(url);
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, u).setPackage("com.twitter.android"));
+                    } catch (ActivityNotFoundException e) {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, u));
+                        } catch (ActivityNotFoundException ignored) { }
+                    }
+                });
+            }
+
             @JavascriptInterface
             public boolean xLoggedIn() {
                 return WebPageActivity.xLoggedIn();

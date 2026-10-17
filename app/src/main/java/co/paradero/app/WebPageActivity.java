@@ -115,7 +115,6 @@ public class WebPageActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                if (isGoogle(u) && (request.isForMainFrame() || request.hasGesture())) { explainGoogle(); return true; }
                 if (!request.isForMainFrame() || isX(u) || (any && "https".equals(u.getScheme()))) return false;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, u));

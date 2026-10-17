@@ -68,6 +68,14 @@ button{cursor:pointer}
 .when small{display:block;font-size:13px;color:var(--muted)}
 .when em{font-style:normal;font-size:14px;font-weight:700;color:var(--accent)}
 .when.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.pay{display:flex;flex-direction:column;gap:6px}
+.pay>span{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.pay small{font-size:13px;color:var(--muted)}
+.seg2{display:grid;grid-template-columns:1fr 1fr;background:var(--sunk);border-radius:12px;padding:4px;gap:4px}
+.seg2 button{border:0;background:transparent;border-radius:9px;padding:9px 6px;font-size:14px;font-weight:600;color:var(--muted)}
+.seg2 button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.tag.alt{background:var(--sunk);color:var(--ink)}
+.meta .cost b{color:var(--ink);font-size:16px}
 .modal{position:fixed;inset:0;z-index:2200;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
 .modal-card{width:100%;max-width:560px;background:var(--surface);border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column}
 .modal-card h3{margin:0 0 8px;font-family:var(--f-display);font-size:22px}
@@ -267,6 +275,7 @@ button{cursor:pointer}
         <button type="button" class="pick" id="pick-to"><small>Hacia</small><span class="ph">¿A dónde vas?</span></button>
       </div>
       <button type="button" class="when" id="when"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b id="when-text">Salir ahora</b><small id="when-day"></small></span><em>Cambiar</em></button>
+      <div class="pay"><span>Pagas con</span><div class="seg2" id="payrow"><button type="button" data-pay="1">TuLlave personalizada</button><button type="button" data-pay="0">Otra tarjeta o débito</button></div><small id="payhint"></small></div>
       <div class="row">
         <button type="submit" class="go" id="go" disabled>Cargando rutas…</button>
       </div>

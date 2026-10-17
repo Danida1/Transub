@@ -7,8 +7,15 @@
   const XFER_RADIUS = 500;   // m para cambiar de paradero a pie
   const ACCESS_RADIUS = 1000;
   const MAX_RIDES = 4;
-  const XFER_PENALTY = 150;  // s extra por cada transbordo (incomodidad)
+  const XFER_PENALTY = 300;  // s extra por cada transbordo (incomodidad)
   const INF = 1e12;
+  // Tarifa 2026 (Decreto Distrital, vigente desde el 14 de enero de 2026): igual para troncal, zonal y TransMiCable
+  const FARE = 3550;
+  const FREE_WINDOW = 125 * 60;     // con TuLlave personalizada: transbordos a $0 durante 125 minutos
+  const FREE_XFERS = 2;
+  const PESOS_PER_MIN = 150;        // cuánto vale un minuto para comparar tiempo y dinero
+  const FARE_SEC = FARE / PESOS_PER_MIN * 60;
+  const trunk = k => k === "T" || k === "C" || k === "D" || k === "A";
 
   function hav(a1, o1, a2, o2) {
     const R = 6371000, t = Math.PI / 180, dA = (a2 - a1) * t, dO = (o2 - o1) * t;
@@ -128,7 +135,21 @@
   };
 
   // Una pasada de RAPTOR. banned: Set de índices de ruta que no se pueden usar.
-  Network.prototype.raptor = function (o, d, banned) {
+  // Costo extra (en segundos) de subirse a pi en la parada s en la ronda k
+  Network.prototype.xferPen = function (rounds, k, s, pi, farePen) {
+    if (k === 1) return 0;
+    const P = rounds[k - 1];
+    let src = s, exited = false;
+    if (P.wp[s] >= 0) { src = P.wp[s]; exited = !(this.parent[src] >= 0 && this.parent[src] === this.parent[s]); }
+    const ppi = P.rp[src];
+    if (ppi < 0) return XFER_PENALTY;
+    const pk = this.routes[this.pats[ppi].r].k, nk = this.routes[this.pats[pi].r].k;
+    if (trunk(pk) && trunk(nk) && (!exited || pk === "A" || nk === "A")) return 60;   // sin salir de la estación
+    return XFER_PENALTY + (k - 1 > FREE_XFERS ? FARE_SEC : farePen);
+  };
+
+  Network.prototype.raptor = function (o, d, banned, farePen) {
+    farePen = farePen || 0;
     const N = this.N, walkT = m => m * DETOUR / WALK, T0 = this.t0;
     let access = this.near(o.lat, o.lng, ACCESS_RADIUS);
     if (access.length < 3) access = this.near(o.lat, o.lng, ACCESS_RADIUS * 2);
@@ -156,7 +177,6 @@
           const cur = q.get(pi); if (cur === undefined || pos < cur) q.set(pi, pos);
         }
       }
-      const pen = k > 1 ? XFER_PENALTY : 0;
       for (const [pi, start] of q) {
         const p = this.pats[pi];
         let boardPos = -1, boardT = INF, boardWait = 0;
@@ -170,7 +190,7 @@
             const hw = this.hwAt(pi, T0 + prev[s]);
             if (!hw) continue;                    // a esa hora la ruta no pasa
             const w = this.waitSec(pi, hw);
-            const cand = prev[s] + w + pen;
+            const cand = prev[s] + w + this.xferPen(rounds, k, s, pi, farePen);
             const curAt = boardPos >= 0 ? boardT + p.cum[i] - p.cum[boardPos] : INF;
             if (cand < curAt) { boardPos = i; boardT = cand; boardWait = w; }
           }
@@ -223,27 +243,70 @@
     }
     const m = rounds[0].accessDist.get(s) || 0;
     legs.unshift({ kind: "walk", meters: m, sec: m * DETOUR / WALK, fromPoint: o, to: s });
-    return { total: r.total, rides: r.rides, legs };
+    const time = legs.reduce((t, l) => t + l.sec + (l.wait || 0), 0);   // tiempo real, sin castigos
+    return { total: time, rides: r.rides, legs };
   };
 
+  // Costo del viaje: troncal, alimentador, dual y cable sin salir de la estación = un solo ingreso.
+  // Con TuLlave personalizada los dos primeros transbordos dentro de 125 min cuestan $0.
+  Network.prototype.fare = function (op, personal) {
+    const entries = [];
+    let t = 0, prev = null, between = null;
+    for (const l of op.legs) {
+      if (l.kind !== "ride") { if (prev) between = l; t += l.sec; continue; }
+      const k = this.routes[l.route].k, tb = t + (l.wait || 0);
+      let cont = false;
+      if (prev) {
+        const pk = this.routes[prev.route].k;
+        const inside = !between || between.kind !== "xfer" || (this.parent[between.from] >= 0 && this.parent[between.from] === this.parent[between.to]) ||
+          ((pk === "A" || k === "A") && between.meters < 300);
+        cont = trunk(pk) && trunk(k) && inside;
+      }
+      if (!cont) { entries.push({ t: tb, alim: k === "A", legs: [l] }); }
+      else { const e = entries[entries.length - 1]; e.legs.push(l); if (k !== "A") e.alim = false; }
+      t = tb + l.sec; prev = l; between = null;
+    }
+    let cost = 0, full = 0, start = null, used = 0;
+    for (const e of entries) {
+      let pay;
+      if (e.alim) pay = "alim";
+      else if (start === null || !personal || used >= FREE_XFERS || e.t - start > FREE_WINDOW) { cost += FARE; full++; start = e.t; used = 0; pay = "full"; }
+      else { used++; pay = "free"; }
+      e.legs.forEach((l, i) => { l.pay = i === 0 ? pay : "inside"; });
+    }
+    return { cost, full, entries: entries.length };
+  };
+  Network.FARE = FARE;
+
   // Opciones variadas para la hora indicada (por defecto, ahora)
-  Network.prototype.plan = function (o, d, when) {
+  Network.prototype.plan = function (o, d, when, personal) {
     this.setTime(when || new Date());
+    personal = personal !== false;
     const opts = [], seen = new Set();
-    const score = x => x.total + Math.max(0, x.rides - 1) * 240;
+    // Puntaje: tiempo real + dinero convertido a minutos + incomodidad de cada transbordo
+    const score = x => {
+      if (x.score === undefined) {
+        const f = this.fare(x, personal); x.cost = f.cost; x.fares = f.full;
+        x.xfers = Math.max(0, f.entries - 1);   // transbordos que implican salir y volver a validar
+        x.score = x.total + f.cost / PESOS_PER_MIN * 60 + Math.max(0, x.rides - 1) * XFER_PENALTY + x.xfers * XFER_PENALTY;
+      }
+      return x.score;
+    };
     const add = it => {
       const sig = it.legs.filter(l => l.kind === "ride").map(l => l.route).join(">");
       if (!sig || seen.has(sig)) return;
       seen.add(sig); opts.push(it);
     };
-    this.raptor(o, d, null).forEach(add);
+    this.raptor(o, d, null, personal ? 0 : FARE_SEC).forEach(add);
+    // Variante que evita pagar otro pasaje: privilegia seguir dentro del sistema troncal
+    this.raptor(o, d, null, FARE_SEC).forEach(add);
     const banned = new Set();
     for (let attempt = 0; attempt < 2 && opts.length; attempt++) {
       const main = opts.slice().sort((a, b) => score(a) - score(b))[0];
       const longest = main.legs.filter(l => l.kind === "ride").sort((a, b) => b.sec - a.sec)[0];
       if (!longest) break;
       banned.add(longest.route);
-      const alt = this.raptor(o, d, banned);
+      const alt = this.raptor(o, d, banned, personal ? 0 : FARE_SEC);
       if (!alt.length) break;
       alt.sort((a, b) => score(a) - score(b)); add(alt[0]);
     }
@@ -251,7 +314,7 @@
     if (dist < 2200) opts.push({ total: dist * DETOUR / WALK, rides: 0, legs: [{ kind: "walk", meters: dist, sec: dist * DETOUR / WALK, fromPoint: o, toPoint: d }] });
     opts.sort((a, b) => score(a) - score(b));
     const bestScore = opts.length ? score(opts[0]) : 0;
-    return opts.filter(x => score(x) <= bestScore * 1.35 + 300).slice(0, 4).sort((a, b) => a.total - b.total);
+    return opts.filter(x => score(x) <= bestScore * 1.3 + 300).slice(0, 4);   // la primera es la recomendada
   };
 
   function decode(str) {

@@ -288,7 +288,7 @@
     note(origin.approx || dest.approx ? "Las direcciones se ubican de forma aproximada según la cuadrícula de calles y carreras." : "");
     $("results").innerHTML = '<div class="loading"><div class="spin"></div>Calculando rutas en servicio…</div>';
     setTimeout(() => {
-      options = P.net.plan(origin, dest, planWhen || new Date()); selected = -1;
+      options = P.net.plan(origin, dest, planWhen || new Date(), personal()); selected = -1;
       renderResults(); drawPreview();
     }, 30);
   }
@@ -303,6 +303,18 @@
   function headOf(l) { const p = P.net.pats[l.pat]; return p.h || P.net.routes[p.r].l || P.net.name[p.s[p.s.length - 1]]; }
   P.headOf = headOf; P.stopLabel = stopLabel;
 
+  const money = v => v ? "$" + v.toLocaleString("es-CO") : "Gratis";
+  P.money = money;
+  function personal() { return store.get("personal", true); }
+  // Qué se paga al subir a este bus
+  function payText(l, r) {
+    const F = money(Router.Network.FARE);
+    if (l.pay === "full") return r.k === "A" ? ` · <b>pagas ${F}</b> al entrar al portal` : ` · <b>pagas ${F}</b>`;
+    if (l.pay === "free") return " · transbordo sin costo con tu TuLlave personalizada";
+    if (l.pay === "inside") return " · sin pagar otra vez: sigues dentro de la estación";
+    if (l.pay === "alim") return " · alimentador sin costo";
+    return "";
+  }
   function turnsHtml(l) {
     if (!l.walk || !l.walk.steps.length) return "";
     return '<ol class="turns">' + l.walk.steps.slice(0, 10).map(t => `<li>${esc(t.text)}${t.dist >= 10 ? ` <span>${meters(t.dist)}</span>` : ""}</li>`).join("") + "</ol>";
@@ -320,7 +332,7 @@
       } else {
         const r = net.routes[l.route], n = l.apos - l.bpos;
         out.push({ b: badgeHtml(r), t: `${esc(kindLabel(r))} ${esc(r.s)} hacia ${esc(headOf(l))}`,
-          s: `Sube en ${esc(net.name[l.from])} · baja en ${esc(net.name[l.to])} · ${n} ${n === 1 ? "parada" : "paradas"} · pasa cada ~${Math.round(l.hw)} min`,
+          s: `Sube en ${esc(net.name[l.from])} · baja en ${esc(net.name[l.to])} · ${n} ${n === 1 ? "parada" : "paradas"} · pasa cada ~${Math.round(l.hw)} min${payText(l, r)}`,
           m: fmtDur(l.sec + l.wait) });
       }
     });
@@ -347,7 +359,7 @@
       box.appendChild(b);
       if (!options.length) { $("previewmap").hidden = true; return; }
     }
-    const fastest = Math.min(...options.map(o => o.total));
+    const fastest = Math.min(...options.map(o => o.total)), cheapest = Math.min(...options.map(o => o.cost || 0));
     const hint = document.createElement("p"); hint.className = "hintline";
     hint.textContent = (planWhen ? "Saliendo " + whenText(planWhen).toLowerCase() + ". " : "Rutas en servicio ahora. ") + (selected < 0 ? "Toca una opción para ver el paso a paso." : "");
     box.appendChild(hint);
@@ -360,10 +372,10 @@
         if (l.kind === "walk") return `<div class="seg walk" style="flex:${w}"></div>`;
         const r = net.routes[l.route]; return `<div class="seg" style="flex:${w};background:#${r.c};color:#${r.x}">${esc(r.s)}</div>`;
       }).join("");
-      const tag = op.total === fastest ? '<span class="tag">Más rápida</span>' : "";
+      const tag = idx === 0 ? '<span class="tag">Recomendada</span>' : op.total === fastest ? '<span class="tag alt">Más rápida</span>' : (op.cost || 0) === cheapest && (options[0].cost || 0) > cheapest ? '<span class="tag alt">Más barata</span>' : "";
       let html = `<div class="opt-top"><span class="dur">${durHtml(op.total)}</span><span class="arr">Llegas ${fmtTime(new Date(base.getTime() + op.total * 1000))}</span>${tag}</div>
         <div class="strip" aria-hidden="true">${strip}</div>
-        <div class="meta"><span><b>${Math.max(0, rides.length - 1)}</b> ${rides.length - 1 === 1 ? "transbordo" : "transbordos"}</span><span><b>${meters(walkM)}</b> a pie</span>${rides.length ? "" : "<span>Sin bus</span>"}</div>`;
+        <div class="meta"><span class="cost"><b>${money(op.cost || 0)}</b>${op.fares > 1 ? ` · ${op.fares} pasajes` : op.fares === 1 ? " · 1 pasaje" : ""}</span><span><b>${Math.max(0, rides.length - 1)}</b> ${rides.length - 1 === 1 ? "cambio de bus" : "cambios de bus"}</span><span><b>${meters(walkM)}</b> a pie</span>${rides.length ? "" : "<span>Sin bus</span>"}</div>`;
       if (idx === selected) {
         html += '<ol class="steps">' + stepsFor(op).map(s => `<li>${s.b}<div class="t">${s.t}<small>${s.s}</small></div><span class="m">${s.m}</span></li>`).join("") + "</ol>";
         html += `<button class="start" data-start>${ICON.go} Iniciar viaje</button>`;
@@ -407,6 +419,19 @@
     setTimeout(() => { pmap.invalidateSize(); pmap.fitBounds(L.latLngBounds(all).pad(0.12)); }, 60);
   }
   onGps(pos => { if (pos && pme) pme.setLatLng([pos.lat, pos.lng]); });
+
+  // ---------- Forma de pago ----------
+  function renderPay() {
+    const on = personal();
+    document.querySelectorAll("#payrow button").forEach(b => b.classList.toggle("on", (b.dataset.pay === "1") === on));
+    $("payhint").textContent = on ? "Transbordos sin costo durante 125 minutos (hasta 2)." : "Pagas el pasaje completo cada vez que validas.";
+  }
+  $("payrow").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    store.set("personal", b.dataset.pay === "1"); renderPay();
+    if (origin && dest && options.length) run();
+  });
+  renderPay();
 
   // ---------- Programar viaje ----------
   const WD = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];

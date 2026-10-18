@@ -93,16 +93,21 @@
         return `<button class="dir ${i === dirIdx ? "on" : ""}" data-i="${i}">${P.ICON.arrow}<span>Hacia <b>${esc(h)}</b><br><small style="color:var(--muted)">Desde ${esc(net.name[q.s[0]])} · ${q.s.length} paradas</small></span></button>`;
       }).join("") + "</div>";
     }
-    html += `<div class="card"><h3>Recorrido hacia ${esc(head)}</h3><div class="mapbox" id="lmap"></div>
-      <p class="fine" style="margin-top:10px"><b style="color:var(--ink)">Inicio:</b> ${esc(first)} &nbsp;·&nbsp; <b style="color:var(--ink)">Final:</b> ${esc(last)}<br>${p.s.length} paradas · recorrido completo de unos ${esc(P.fmtDur(dur))}</p></div>`;
+    // Horario de hoy, bien visible
+    const today = p.d && p.d[net.dt], DAYNAME = { L: "Hoy (día hábil)", S: "Hoy (sábado)", D: "Hoy (domingo o festivo)" };
+    html += today
+      ? `<div class="today"><small>${DAYNAME[net.dt]} · primer y último bus</small><b>${esc(P.fmtMin(today[0]))} <span>a</span> ${esc(P.fmtMin(today[1]))}</b></div>`
+      : `<div class="today off"><small>${DAYNAME[net.dt]}</small><b>No opera hoy</b></div>`;
     // horarios
-    html += '<div class="card"><h3>Horario</h3><table class="sched">' + DAYS.map(([k, label]) => {
+    html += '<div class="card"><h3>Horario de la semana</h3><table class="sched">' + DAYS.map(([k, label]) => {
       const a = p.d && p.d[k];
       if (!a) return `<tr><th>${label}</th><td>No opera</td></tr>`;
       const hs = a.slice(3).filter(h => h > 0 && h < 60);
       const freq = hs.length ? (Math.min(...hs) === Math.max(...hs) ? `cada ~${hs[0]} min` : `cada ${Math.min(...hs)} a ${Math.max(...hs)} min`) : "pocas salidas";
       return `<tr><th>${label}</th><td><span class="num">${P.fmtMin(a[0])} – ${P.fmtMin(a[1])}</span><small>${freq}</small></td></tr>`;
     }).join("") + '</table><p class="fine" style="margin-top:8px">Primera y última salida desde ' + esc(first) + ".</p></div>";
+    html += `<div class="card"><h3>Recorrido hacia ${esc(head)}</h3><div class="mapbox" id="lmap"></div>
+      <p class="fine" style="margin-top:10px"><b style="color:var(--ink)">Inicio:</b> ${esc(first)} &nbsp;·&nbsp; <b style="color:var(--ink)">Final:</b> ${esc(last)}<br>${p.s.length} paradas · recorrido completo de unos ${esc(P.fmtDur(dur))}</p></div>`;
     // paradas
     const many = p.s.length > 14;
     html += `<div class="card"><h3>Paradas (${p.s.length})</h3><ol class="stops" id="lstops">` + p.s.map((s, i) =>

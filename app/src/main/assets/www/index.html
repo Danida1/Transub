@@ -143,7 +143,7 @@ button{cursor:pointer}
 .hint{padding:14px 8px;font-size:15px;color:var(--muted)}
 
 /* Resultados */
-.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sec-h{scroll-margin-top:12px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .sec-h h2{font-family:var(--f-display);font-size:21px;margin:0;font-weight:700}
 .sec-h span{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .results{display:flex;flex-direction:column;gap:10px}
@@ -255,6 +255,11 @@ button{cursor:pointer}
 .lhead .badge{min-width:64px;height:44px;font-size:22px;border-radius:9px}
 .lhead b{display:block;font-size:20px;line-height:1.2}
 .lhead small{display:block;color:var(--muted);font-size:14px}
+.today{display:block;margin-top:10px;padding:14px 16px;border-radius:14px;background:var(--surface);border:1.5px solid var(--line)}
+.today small{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:2px}
+.today b{display:block;font-size:22px;font-weight:700;white-space:nowrap}
+.today b span{font-weight:500;color:var(--muted);font-size:15px}
+.today.off b{color:var(--muted)}
 .status{border-radius:12px;padding:12px 14px;font-size:15px;font-weight:600}
 .status.on{background:var(--ok-bg);color:var(--ok)}
 .status.off{background:var(--off-bg);color:var(--off)}
@@ -265,12 +270,12 @@ button{cursor:pointer}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
 .card h3{margin:0 0 10px;font-family:var(--f-display);font-size:17px}
 .sched{width:100%;border-collapse:collapse;font-size:15px}
-.sched th{text-align:left;font-weight:600;padding:9px 8px 9px 0;vertical-align:top;width:40%}
+.sched th{text-align:left;font-weight:600;padding:9px 8px 9px 0;vertical-align:top;width:34%}
 .sched td{padding:9px 0;border-top:1px solid var(--line);vertical-align:top}
 .sched tr:first-child td,.sched tr:first-child th{border-top:0}
 .sched th{border-top:1px solid var(--line)}
 .sched td small{display:block;color:var(--muted);font-size:13px}
-.sched .num{font-family:var(--f-num);font-size:14px}
+.sched .num{font-size:15px;font-weight:600;white-space:nowrap}
 .stops{list-style:none;margin:0;padding:0}
 .stops li{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;font-size:15px;padding:5px 0;position:relative}
 .stops li::before{content:"";position:absolute;left:10px;top:0;bottom:0;width:2px;background:var(--line)}

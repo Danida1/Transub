@@ -397,10 +397,15 @@
     if (Router.hav(origin.lat, origin.lng, dest.lat, dest.lng) < 120) { note("El origen y el destino están en el mismo punto.", true); return; }
     note(origin.approx || dest.approx ? "Las direcciones se ubican de forma aproximada según la cuadrícula de calles y carreras." : "");
     $("results").innerHTML = '<div class="loading"><div class="spin"></div>Calculando rutas en servicio…</div>';
+    $("opth").hidden = false; $("summary").textContent = `${origin.name} → ${dest.name}`;
+    // Llevar la vista a las opciones, sin tener que bajar a buscarlas
+    const toResults = () => $("opth").scrollIntoView({ behavior: "smooth", block: "start" });
+    requestAnimationFrame(toResults);
     saveRecentTrip(origin, dest);
     setTimeout(() => {
       options = P.net.plan(origin, dest, planWhen || new Date(), personal(), mode); selected = -1;
       renderResults(); drawPreview();
+      requestAnimationFrame(toResults);   // ya con las opciones, la página es más larga
     }, 30);
   }
 

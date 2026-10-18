@@ -1,0 +1,22 @@
+name: Datos OSM (temporal)
+on:
+  push:
+    branches: [osm-data]
+permissions:
+  contents: write
+jobs:
+  osm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python tools/fetch_osm.py osm
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: osm-tmp
+          name: osm-tmp
+          prerelease: true
+          target_commitish: osm-data
+          files: osm/*.json.gz

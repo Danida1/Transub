@@ -121,6 +121,8 @@
   let origin = null, dest = null, options = [], selected = -1, searchIndex = [], planWhen = null;
 
   async function load() {
+    // Cruces de calles para ubicar direcciones con precisión (se carga aparte para no demorar las rutas)
+    fetch("data/streets.json").then(r => r.ok ? r.json() : null).then(j => Geo.setStreets(j)).catch(() => {});
     try {
       const r = await fetch("data/network.json");
       if (!r.ok) throw new Error("HTTP " + r.status);

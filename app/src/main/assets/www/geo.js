@@ -66,15 +66,78 @@
   const numVal = m => { const L = m[2] || m[4]; return +m[1] + (L ? Math.min(L.charCodeAt(0) - 96, 3) * 0.25 : 0) + (m[3] ? 0.15 : 0); };
   const numTxt = m => m[1] + (m[2] ? m[2].toUpperCase() : "") + (m[3] ? " Bis" : "") + (m[4] ? " " + m[4].toUpperCase() : "");
 
+  // Orden de la nomenclatura (igual que tools/build_streets.py): 19 < 19 Bis < 19A < 19A Bis < 19B < 20
+  const nomVal = m => +m[1] + (m[2] ? Math.min(m[2].charCodeAt(0) - 96, 5) * 0.18 : 0) + (m[3] ? 0.09 : 0) + (m[4] ? Math.min(m[4].charCodeAt(0) - 96, 5) * 0.015 : 0);
+  const nomKey = m => +m[1] + (m[2] ? m[2].toUpperCase() : "") + (m[3] ? "BIS" : "") + (m[4] ? m[4].toUpperCase() : "");
+  const LETTER = w => /^(diagonal|diag|dg)$/.test(w) ? "D" : /^(transversal|trans|tv)$/.test(w) ? "T" : null;
+  const SAME = { C: "D", D: "C", K: "T", T: "K" };
+  const FAM = t => (t === "C" || t === "D") ? "c" : "k";
+
+  // ---------- Cruces reales de las calles (OpenStreetMap), cargados de data/streets.json ----------
+  let STREETS = null;
+  function setStreets(j) { STREETS = j && j.s ? j.s : null; }
+  const R = 6371000, rad = Math.PI / 180;
+  const dist = (a, b) => { const x = (b.lat - a.lat) * rad, y = (b.lng - a.lng) * rad * Math.cos(a.lat * rad); return R * Math.hypot(x, y); };
+  // Punto de una calle a la altura del número v (interpolando entre los cruces conocidos)
+  function at(list, v) {
+    const n = list.length / 3;
+    if (!n) return null;
+    if (v < list[0] - 0.02 || v > list[(n - 1) * 3] + 0.02) return null;
+    for (let i = 0; i < n; i++) {
+      const vi = list[i * 3];
+      if (Math.abs(vi - v) < 0.005) return { lat: list[i * 3 + 1], lng: list[i * 3 + 2] };
+      if (vi > v) {
+        if (!i) return { lat: list[1], lng: list[2] };
+        const v0 = list[i * 3 - 3]; if (vi - v0 > 6) return null;   // tramo sin cruces conocidos: no adivinar
+        const f = (v - v0) / (vi - v0);
+        return { lat: list[i * 3 - 2] + (list[i * 3 + 1] - list[i * 3 - 2]) * f, lng: list[i * 3 - 1] + (list[i * 3 + 2] - list[i * 3 - 1]) * f };
+      }
+    }
+    return { lat: list[(n - 1) * 3 + 1], lng: list[(n - 1) * 3 + 2] };
+  }
+  // Avanza "placa" metros desde el cruce hacia el siguiente número
+  function walkPlate(list, v, plate) {
+    const a = at(list, v); if (!a) return null;
+    if (!plate) return a;
+    const dir = v < 0 ? -1 : 1;
+    let b = at(list, v + dir), sign = 1;
+    if (!b) { b = at(list, v - dir); sign = -1; }
+    if (!b) return a;
+    const d = dist(a, b); if (d < 5) return a;
+    const f = Math.min(plate / d, 0.9) * sign;
+    return { lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f };
+  }
+  function locate(q) {
+    if (!STREETS) return null;
+    // 1) Sobre la vía principal: cruce con la vía del número después de "#", más la placa
+    for (const t of [q.t, SAME[q.t]]) {
+      const list = STREETS[t + q.key];
+      if (list) { const p = walkPlate(list, q.cross, q.plate); if (p) return { p, exact: t === q.t }; }
+    }
+    // 2) Sobre la vía del cruce, a la altura de la principal (sin la placa si no se puede orientar)
+    for (const t of FAM(q.t) === "c" ? ["K", "T"] : ["C", "D"]) {
+      const list = STREETS[t + q.crossKey];
+      const p = list && at(list, q.main);
+      if (p) {
+        const n1 = q.cross, n2 = q.cross + (q.cross < 0 ? -1 : 1);
+        const g1 = FAM(q.t) === "c" ? GRID(q.main, n1) : GRID(n1, q.main), g2 = FAM(q.t) === "c" ? GRID(q.main, n2) : GRID(n2, q.main);
+        const d = dist(g1, g2) || 1, f = Math.min(q.plate / d, 0.9);
+        return { p: { lat: p.lat + (g2.lat - g1.lat) * f, lng: p.lng + (g2.lng - g1.lng) * f }, exact: false };
+      }
+    }
+    return null;
+  }
+
   function parseAddress(raw) {
-    let s = norm(raw).replace(/n[°ºo]\.?\s*(?=\d)/g, "# ").replace(/\s+/g, " ").trim(), rest, type, first, firstTxt;
-    for (const [re, t, n, label] of NAMED) { const m = s.match(re); if (m) { type = t; first = n; firstTxt = label; rest = s.slice(m[0].length); break; } }
+    let s = norm(raw).replace(/n[°ºo]\.?\s*(?=\d)/g, "# ").replace(/\s+/g, " ").trim(), rest, type, first, firstTxt, letter, key, mainVal;
+    for (const [re, t, n, label] of NAMED) { const m = s.match(re); if (m) { type = t; first = n; firstTxt = label; letter = t; key = String(n); mainVal = n; rest = s.slice(m[0].length); break; } }
     if (!type) {
       let word = "";
       for (const [re, t] of TYPES) { const m = s.match(re); if (m) { type = t; word = m[1]; rest = s.slice(m[0].length); break; } }
       if (!type) return null;
       const m = rest.match(NUM); if (!m) return null;
       first = numVal(m);
+      letter = LETTER(word) || type; key = nomKey(m); mainVal = nomVal(m);
       firstTxt = (WORD[word] || (type === "C" ? "Calle" : "Carrera")) + " " + numTxt(m) + (m[5] ? " " + m[5][0].toUpperCase() + m[5].slice(1) : "");
       rest = rest.slice(m[0].length);
     }
@@ -85,9 +148,15 @@
     const sur = /\bsur\b/.test(s), este = /\beste\b/.test(s);
     let calle = type === "C" ? first : second, carrera = type === "C" ? second : first;
     if (sur) calle = -calle; if (este) carrera = -carrera;
+    const label = `${firstTxt} # ${numTxt(m2)}${m2[5] ? "-" + m2[5] : ""}${sur && !/sur/i.test(firstTxt) ? " Sur" : ""}`;
+    // "Sur" siempre va con el número de la calle y "Este" con el de la carrera
+    const famC = FAM(letter) === "c", mainNeg = famC ? sur : este, crossNeg = famC ? este : sur;
+    const q = { t: letter, key: key + (mainNeg ? (famC ? "S" : "E") : ""), main: mainNeg ? -mainVal : mainVal,
+      cross: crossNeg ? -nomVal(m2) : nomVal(m2), crossKey: nomKey(m2) + (crossNeg ? (famC ? "E" : "S") : ""), plate };
+    const hit = locate(q);
+    if (hit && inBogota(hit.p)) return { name: label, lat: hit.p.lat, lng: hit.p.lng, kind: "Dirección", approx: false };
     const p = GRID(calle, carrera);
     if (!inBogota(p)) return null;
-    const label = `${firstTxt} # ${numTxt(m2)}${m2[5] ? "-" + m2[5] : ""}${sur && !/sur/i.test(firstTxt) ? " Sur" : ""}`;
     return { name: label, lat: p.lat, lng: p.lng, kind: "Dirección aprox.", approx: true };
   }
 
@@ -148,5 +217,5 @@
     } catch (e) { return { name: "", sub: "" }; }
   }
 
-  root.Geo = { parseAddress, searchOnline, reverse, addAnchors, norm, inBogota };
+  root.Geo = { parseAddress, setStreets, searchOnline, reverse, addAnchors, norm, inBogota };
 })(typeof window !== "undefined" ? window : globalThis);

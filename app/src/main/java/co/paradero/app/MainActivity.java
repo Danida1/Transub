@@ -136,6 +136,11 @@ public class MainActivity extends Activity {
             }
 
             @JavascriptInterface
+            public double tripEndedAt() {
+                return (double) getSharedPreferences("trip", MODE_PRIVATE).getLong("endedAt", 0);
+            }
+
+            @JavascriptInterface
             public void speak(String text) {
                 if (tts != null && ttsReady) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "aviso");
             }

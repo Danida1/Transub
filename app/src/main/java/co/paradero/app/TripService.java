@@ -66,6 +66,7 @@ public class TripService extends Service implements LocationListener {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
         if (ACTION_STOP.equals(action)) {
+            if (intent.getBooleanExtra("user", false)) markEnded();   // "Terminar viaje" en la notificación
             stopTrip();
             return START_NOT_STICKY;
         }
@@ -147,6 +148,7 @@ public class TripService extends Service implements LocationListener {
                 announce(a.text);
                 if (next >= alerts.size()) {
                     updateNotification("Llegaste a tu destino");
+                    markEnded();
                     handler.postDelayed(this::stopTrip, 8000);
                 } else {
                     updateNotification(alerts.get(next).hint);
@@ -175,7 +177,7 @@ public class TripService extends Service implements LocationListener {
     private Notification buildNotification(String text) {
         Intent open = new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         PendingIntent openPi = PendingIntent.getActivity(this, 1, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        Intent stop = new Intent(this, TripService.class).setAction(ACTION_STOP);
+        Intent stop = new Intent(this, TripService.class).setAction(ACTION_STOP).putExtra("user", true);
         PendingIntent stopPi = PendingIntent.getService(this, 2, stop, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         return new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_launcher_monochrome)
@@ -194,6 +196,11 @@ public class TripService extends Service implements LocationListener {
     private void updateNotification(String text) {
         NotificationManager nm = getSystemService(NotificationManager.class);
         nm.notify(NOTIF_ID, buildNotification(text));
+    }
+
+    // Para que Transub sepa, al abrirse, que el viaje lo terminaste tú (o llegaste) y no que Android cerró el servicio
+    private void markEnded() {
+        getSharedPreferences("trip", MODE_PRIVATE).edit().putLong("endedAt", System.currentTimeMillis()).apply();
     }
 
     private void stopTrip() {

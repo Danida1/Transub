@@ -552,6 +552,16 @@ body.has-trip .obody{padding-bottom:96px!important}
   </div>
 </div>
 
+<div class="modal" id="resumeSheet" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="rs-title">
+    <h3 id="rs-title">Tienes un viaje sin terminar</h3>
+    <p class="wdesc" style="margin:4px 0 2px">Hacia <b id="rs-dest"></b></p>
+    <p class="wdesc" id="rs-when" style="margin:0 0 16px"></p>
+    <button type="button" class="go" id="rs-go">Seguir viajando</button>
+    <button type="button" class="linkbtn" id="rs-end" style="margin-top:12px;align-self:center;padding:8px 14px">Terminar ese viaje</button>
+  </div>
+</div>
+
 <button class="tripbar" id="tripbar" hidden><span class="tb-dot" aria-hidden="true"></span><span class="tb-tx"><b id="tb-title">Viaje en curso</b><small id="tb-sub">Toca para ver el mapa</small></span><em>Ver</em></button>
 
 <nav class="tabs" aria-label="Secciones">

@@ -180,26 +180,52 @@
   tripBar = function (eta) { _tripBar(eta); if (P.ostartLabel) P.ostartLabel(); };
   $("tripbar").addEventListener("click", openNav);
 
-  // Al abrir la app: recuperar el viaje que quedó activo
+  // Al abrir la app: recuperar el viaje que quedó activo.
+  // Solo se descarta si lo terminaste tú (o llegaste); si Android cerró la app, se ofrece "Seguir viajando".
+  const endedAt = () => { try { return window.Android && Android.tripEndedAt ? +Android.tripEndedAt() : 0; } catch (e) { return 0; } };
+  let pending = null;
   function restore() {
     const t = P.store.get("trip", null);
     if (!t || trip) return;
     const native = !!(window.Android && Android.tripRunning);
     const running = native ? Android.tripRunning() : false;
-    const fresh = Date.now() - (t.startedAt || 0) < 6 * 3600000;
-    if (t.net !== P.net.generated || !fresh || (native && t.native && !running)) { P.store.set("trip", null); return; }
-    nativeTrip = running;
+    const fresh = Date.now() - (t.startedAt || 0) < 12 * 3600000;
+    if (t.net !== P.net.generated || !fresh || endedAt() > (t.startedAt || 0)) { P.store.set("trip", null); return; }
+    if (running) { resume(t, false); return; }          // el servicio sigue vivo: continuar sin preguntar
+    pending = t;
+    $("rs-dest").textContent = t.dest.name;
+    const ago = Math.round((Date.now() - t.startedAt) / 60000);
+    $("rs-when").textContent = "Lo iniciaste a las " + P.fmtTime(new Date(t.startedAt)) + (ago >= 1 ? ` (hace ${P.fmtDur(ago * 60)})` : "");
+    $("resumeSheet").hidden = false;
+  }
+  function resume(t, startService) {
+    nativeTrip = !startService;
     t.op.legs.forEach(l => { if (l.walk) l.walkTried = true; });
-    beginTrip(t.op, t.origin, t.dest, new Date(t.base), native && !running);
+    beginTrip(t.op, t.origin, t.dest, new Date(t.base), startService);
     trip.startedAt = t.startedAt;
     save();
   }
+  $("rs-go").addEventListener("click", () => {
+    $("resumeSheet").hidden = true;
+    if (!pending) return;
+    const t = pending; pending = null;
+    resume(t, true); openNav();
+  });
+  $("rs-end").addEventListener("click", () => {
+    $("resumeSheet").hidden = true; pending = null;
+    P.store.set("trip", null); tripBar();
+  });
   window.addEventListener("network", restore);
   if (P.net) restore();
-  // Si el viaje se terminó desde la notificación, también se cierra aquí
+  // Al volver a la app: si terminaste el viaje desde la notificación, se cierra aquí también;
+  // si Android detuvo el servicio por su cuenta, se vuelve a encender para no perder los avisos
   document.addEventListener("visibilitychange", () => {
     if (document.hidden || !trip || !nativeTrip) return;
-    try { if (window.Android && Android.tripRunning && !Android.tripRunning()) endTrip(false); } catch (e) {}
+    try {
+      if (!window.Android || !Android.tripRunning || Android.tripRunning()) return;
+      if (endedAt() > (trip.startedAt || 0)) endTrip(false);
+      else Android.startTrip(JSON.stringify(tripAlerts(trip.op, trip.dest)), voiceOn());
+    } catch (e) {}
   });
 
   P.navTrip = () => trip;

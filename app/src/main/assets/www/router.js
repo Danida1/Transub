@@ -8,7 +8,8 @@
   const ACCESS_RADIUS = 1000;
   const MAX_RIDES = 4;
   const XFER_PENALTY = 300;
-  const WALK_WEIGHT = 1.8;  // s extra por cada transbordo (incomodidad)
+  const WALK_WEIGHT = 2;    // cada metro caminado de más pesa como dos: mejor la ruta que deja más cerca
+  const FREE_WALK = 150;    // los primeros metros a pie no se castigan
   const INF = 1e12;
   // Tarifa 2026 (Decreto Distrital, vigente desde el 14 de enero de 2026): igual para troncal, zonal y TransMiCable
   const FARE = 3550;
@@ -152,8 +153,9 @@
   Network.prototype.raptor = function (o, d, banned, farePen) {
     farePen = farePen || 0;
     const N = this.N, walkT = m => m * DETOUR / WALK, T0 = this.t0;
-    // Caminar más de 400 m pesa más que ir en bus: así se prefiere un alimentador a una caminata larga
-    const walkW = m => walkT(Math.min(m, 400)) + walkT(Math.max(0, m - 400)) * WALK_WEIGHT;
+    // Caminar pesa más que ir sentado en el bus: así se prefiere la ruta que deja al lado del destino
+    // (o un alimentador) aunque llegue un minuto después
+    const walkW = m => walkT(Math.min(m, FREE_WALK)) + walkT(Math.max(0, m - FREE_WALK)) * WALK_WEIGHT;
     // Con el filtro (solo TransMilenio o solo SITP) únicamente sirven los paraderos de ese sistema,
     // y se permite caminar más para llegar a uno (por ejemplo, a la estación más cercana)
     const fb = this._filter, sp = this.stopPats, pats = this.pats;
@@ -307,7 +309,7 @@
       if (x.score === undefined) {
         const f = this.fare(x, personal); x.cost = f.cost; x.fares = f.full;
         x.xfers = Math.max(0, f.entries - 1);   // transbordos que implican salir y volver a validar
-        const longWalk = x.legs.reduce((s, l) => s + (l.kind === "ride" ? 0 : Math.max(0, (l.meters || 0) - 400) * DETOUR / WALK), 0);
+        const longWalk = x.legs.reduce((s, l) => s + (l.kind === "ride" ? 0 : Math.max(0, (l.meters || 0) - FREE_WALK) * DETOUR / WALK), 0);
         x.score = x.total + f.cost / PESOS_PER_MIN * 60 + Math.max(0, x.rides - 1) * XFER_PENALTY + x.xfers * XFER_PENALTY + longWalk * (WALK_WEIGHT - 1);
       }
       return x.score;

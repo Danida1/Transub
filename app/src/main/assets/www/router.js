@@ -339,6 +339,68 @@
     return opts.filter(x => score(x) <= bestScore * 1.3 + 300).slice(0, 4);   // la primera es la recomendada
   };
 
+  // Otras estaciones donde se puede hacer el mismo cambio de bus.
+  // Para el tramo op.legs[i] (un bus) seguido de otro bus, busca a lo largo del primero (antes o
+  // después del cambio sugerido) estaciones donde pase otra ruta que llegue al mismo punto de bajada.
+  Network.prototype.siblings = function (s) {
+    if (!this.kids) { this.kids = new Map(); for (let k = 0; k < this.N; k++) { const pa = this.parent[k]; if (pa >= 0) { let a = this.kids.get(pa); if (!a) this.kids.set(pa, a = []); a.push(k); } } }
+    const pa = this.parent[s];
+    return pa >= 0 ? this.kids.get(pa) || [s] : [s];
+  };
+  Network.prototype.altTransfers = function (op, i, maxExtra) {
+    const legs = op.legs, L1 = legs[i];
+    if (!L1 || L1.kind !== "ride") return [];
+    let j = i + 1; while (j < legs.length && legs[j].kind === "xfer") j++;
+    const L2 = legs[j];
+    if (!L2 || L2.kind !== "ride") return [];
+    maxExtra = maxExtra == null ? 600 : maxExtra;
+    let t0 = 0; for (let k = 0; k < i; k++) t0 += legs[k].sec + (legs[k].wait || 0);
+    const tBoard = t0 + (L1.wait || 0);            // momento en que sales en el primer bus
+    let tChosen = L1.sec; for (let k = i + 1; k < j; k++) tChosen += legs[k].sec; tChosen += (L2.wait || 0) + L2.sec;
+    const p1 = this.pats[L1.pat], targets = new Set(this.siblings(L2.to));
+    const chosenStation = this.parent[L1.to] >= 0 ? "p" + this.parent[L1.to] : "s" + L1.to;
+    const best = new Map();
+    for (let pos = L1.bpos + 1; pos < p1.s.length; pos++) {
+      const sj = p1.s[pos], tA = p1.cum[pos] - p1.cum[L1.bpos];
+      if (tA - tChosen > maxExtra) break;
+      const key = this.parent[sj] >= 0 ? "p" + this.parent[sj] : "s" + sj;
+      if (key === chosenStation) continue;
+      for (const s2 of this.siblings(sj)) {
+        const sp = this.stopPats[s2];
+        for (let x = 0; x < sp.length; x += 2) {
+          const q = sp[x], pos2 = sp[x + 1], pq = this.pats[q];
+          if (pq.r === p1.r) continue;
+          let apos2 = -1;
+          for (let y = pos2 + 1; y < pq.s.length; y++) if (targets.has(pq.s[y])) { apos2 = y; break; }
+          if (apos2 < 0) continue;
+          const tx = s2 === sj ? 0 : 90;
+          const hw = this.hwAt(q, this.t0 + tBoard + tA + tx); if (!hw) continue;
+          const w = this.waitSec(q, hw), arr = tA + tx + w + pq.cum[apos2] - pq.cum[pos2];
+          if (arr - tChosen > maxExtra) continue;
+          const cur = best.get(key);
+          if (!cur || arr < cur.arr) best.set(key, { key, pos, from: sj, board: s2, pat: q, route: pq.r, bpos: pos2, apos: apos2, to: pq.s[apos2], arr, wait: w, hw, rideSec: pq.cum[apos2] - pq.cum[pos2], extra: Math.round(arr - tChosen) });
+        }
+      }
+    }
+    return [...best.values()].sort((a, b) => a.pos - b.pos);
+  };
+  // Itinerario con el cambio en otra estación (alt sale de altTransfers)
+  Network.prototype.withTransfer = function (op, i, alt) {
+    const legs = op.legs, L1 = legs[i];
+    let j = i + 1; while (j < legs.length && legs[j].kind === "xfer") j++;
+    const L2 = legs[j], p1 = this.pats[L1.pat];
+    const out = legs.slice(0, i).map(l => Object.assign({}, l));
+    out.push(Object.assign({}, L1, { to: alt.from, apos: alt.pos, sec: p1.cum[alt.pos] - p1.cum[L1.bpos] }));
+    if (alt.board !== alt.from) out.push({ kind: "xfer", from: alt.from, to: alt.board, meters: hav(this.lat[alt.from], this.lng[alt.from], this.lat[alt.board], this.lng[alt.board]), sec: 90 });
+    out.push({ kind: "ride", pat: alt.pat, route: alt.route, from: alt.board, to: alt.to, bpos: alt.bpos, apos: alt.apos, sec: alt.rideSec, wait: alt.wait, hw: alt.hw });
+    if (alt.to !== L2.to) out.push({ kind: "xfer", from: alt.to, to: L2.to, meters: hav(this.lat[alt.to], this.lng[alt.to], this.lat[L2.to], this.lng[L2.to]), sec: 90 });
+    legs.slice(j + 1).forEach(l => out.push(Object.assign({}, l)));
+    const nop = Object.assign({}, op, { legs: out });
+    nop.total = out.reduce((t, l) => t + l.sec + (l.wait || 0), 0);
+    const f = this.fare(nop, false); nop.cost = f.cost; nop.fares = f.full;
+    return nop;
+  };
+
   function decode(str) {
     const out = []; let i = 0, la = 0, lo = 0;
     while (i < str.length) {

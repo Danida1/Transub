@@ -220,6 +220,57 @@
     return { title: "Viaje a " + dest.name, alerts };
   }
 
+  // ---------- Cambiar de bus en otra estación durante el viaje ----------
+  function altState() {
+    if (!trip || trip.arrived) return null;
+    const op = trip.op, net = P.net;
+    const ci = op.legs.indexOf(trip.legs[trip.cur].l);
+    for (let i = Math.max(0, ci); i < op.legs.length; i++) {
+      const l = op.legs[i]; if (l.kind !== "ride") continue;
+      let after = null;
+      if (i === ci && P.gps.pos) {   // ya vas en este bus: solo las estaciones que vienen
+        const p = net.pats[l.pat]; let bd = Infinity;
+        for (let k = l.bpos; k <= l.apos; k++) { const d = Router.hav(P.gps.pos.lat, P.gps.pos.lng, net.lat[p.s[k]], net.lng[p.s[k]]); if (d < bd) { bd = d; after = k; } }
+      }
+      const list = P.altList(op, i, after);
+      return list.length ? { i, list } : null;
+    }
+    return null;
+  }
+  let altCache = null;
+  function refreshAltBtn() {
+    altCache = altState();
+    $("nav-alt").hidden = !altCache;
+    if (altCache) $("nav-alt").lastChild.textContent = ` Cambiar de bus en otra estación (${altCache.list.length})`;
+  }
+  $("nav-alt").addEventListener("click", () => {
+    refreshAltBtn(); if (!altCache) return;
+    const l = trip.op.legs[altCache.i], r = P.net.routes[l.route];
+    $("navalt-sub").textContent = `Vas en la ${r.s}. El cambio sugerido es en ${P.stopLabel(l.to)}; también puedes hacerlo en:`;
+    $("navalt-list").innerHTML = P.altHtml(altCache.list);
+    $("navalt").hidden = false;
+    P.pushLayer(() => { $("navalt").hidden = true; });
+  });
+  $("navalt-close").addEventListener("click", () => P.popLayer());
+  $("navalt-list").addEventListener("click", e => {
+    const b = e.target.closest(".altx"); if (!b || !altCache) return;
+    const x = altCache.list[+b.dataset.k]; if (!x) return;
+    P.popLayer();
+    replaceOp(x.nop, altCache.i);
+  });
+  // Cambia el itinerario del viaje en curso conservando por dónde vas
+  function replaceOp(nop, legIdx) {
+    const curLeg = trip.op.legs.indexOf(trip.legs[trip.cur].l);
+    trip.op = nop; trip.legs = legsOf(nop);
+    const want = nop.legs[Math.max(0, curLeg)];
+    trip.cur = Math.max(0, trip.legs.findIndex(x => x.l === want));
+    const rest = Object.assign({}, nop, { legs: nop.legs.slice(Math.max(0, curLeg)) });
+    try { if (nativeTrip && window.Android && Android.startTrip) Android.startTrip(JSON.stringify(tripAlerts(rest, trip.dest)), voiceOn()); } catch (e) {}
+    const l = nop.legs[legIdx], nx = nop.legs.slice(legIdx + 1).find(z => z.kind === "ride");
+    say("alt" + Date.now(), `Listo. Bájate en ${P.net.name[l.to]} y toma la ruta ${spell(P.net.routes[nx.route].s)}.`);
+    drawTrip(false); render(P.gps.pos || null); save(); refreshAltBtn();
+  }
+
   $("nav-close").addEventListener("click", () => P.popLayer());     // salir del mapa (el viaje sigue)
   $("nav-end").addEventListener("click", () => endTrip(false));    // terminar el viaje
   $("recenter").addEventListener("click", () => {
@@ -311,6 +362,7 @@
       else { title = "Bájate en " + net.name[l.to]; sub = "Faltan " + left + " paradas · " + P.kindLabel(r) + " " + r.s; }
     }
     $("instr").innerHTML = `${badge}<div><b>${esc(title)}</b><small>${esc(sub)}</small></div>`;
+    if (!trip.altAt || Date.now() - trip.altAt > 20000 || trip.altCur !== trip.cur) { trip.altAt = Date.now(); trip.altCur = trip.cur; refreshAltBtn(); }
     // tiempo restante
     let rem = 0;
     trip.legs.forEach((x, k) => {

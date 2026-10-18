@@ -337,6 +337,24 @@ body.has-trip .obody{padding-bottom:96px!important}
 .tabs button{flex:1;border:0;background:transparent;border-radius:12px;padding:8px 4px;font-weight:600;font-size:13px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
 .tabs button svg{width:22px;height:22px}
 .tabs button[aria-selected="true"]{background:var(--sunk);color:var(--ink)}
+.alts{display:block!important;padding:4px 0 10px!important}
+.alts details{border:1.5px dashed var(--line);border-radius:12px;padding:10px 12px}
+.alts summary{cursor:pointer;font-weight:600;font-size:14.5px;color:var(--accent);list-style:none}
+.alts summary::-webkit-details-marker{display:none}
+.alts summary small{display:block;color:var(--muted);font-weight:500;font-size:13px;margin-top:2px}
+.altlist{display:grid;gap:8px;margin-top:10px}
+.altx{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;color:var(--ink)}
+.altx .tx{flex:1;min-width:0}
+.altx b{display:block;font-size:15px}
+.altx small{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;margin-top:3px}
+.altx small .badge{transform:scale(.85);transform-origin:left center}
+.altx .dx{font-weight:700;font-size:14px;white-space:nowrap;text-align:right;color:var(--muted)}
+.altx .dx.good{color:var(--accent)}
+.altx .dx small{display:block;font-weight:500}
+.navalt-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-bottom:8px;border:0;border-radius:12px;padding:12px;background:var(--surface);color:var(--ink);font-weight:600;font-size:15px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.navalt-btn svg{width:20px;height:20px;color:var(--accent)}
+#navalt .msheet{max-height:75vh;overflow:auto}
+#navalt .mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -521,7 +539,16 @@ body.has-trip .obody{padding-bottom:96px!important}
   <div class="nav-bottom">
     <button class="recenter" id="recenter" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Seguirme</button>
     <div class="navmsg" id="navmsg" hidden></div>
+    <button class="navalt-btn" id="nav-alt" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg> Cambiar de bus en otra estación</button>
     <div class="eta"><div><span class="big" id="eta-dur"></span><small id="eta-time"></small></div><button class="stop" id="nav-end">Terminar</button></div>
+  </div>
+</div>
+
+<div class="modal" id="navalt" hidden>
+  <div class="modal-card msheet" role="dialog">
+    <div class="mhead"><h3 style="margin:0">Otras estaciones para cambiar</h3><button class="iconbtn" id="navalt-close" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <p class="wdesc" id="navalt-sub" style="margin:6px 0 12px"></p>
+    <div class="altlist" id="navalt-list"></div>
   </div>
 </div>
 

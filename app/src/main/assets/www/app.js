@@ -548,7 +548,7 @@
         out.push({ b: '<span class="badge walk">CAMBIO</span>', t: same ? `Cambia de vagón en ${esc(stopLabel(l.to))}` : `Camina hasta ${esc(stopLabel(l.to))}`, s: same ? "Dentro de la misma estación" : meters(l.walk ? l.walk.dist : l.meters) + turnsHtml(l), m: fmtDur(l.sec) });
       } else {
         const r = net.routes[l.route], n = l.apos - l.bpos;
-        out.push({ b: badgeHtml(r), t: `${esc(kindLabel(r))} ${esc(r.s)} hacia ${esc(headOf(l))}`,
+        out.push({ leg: i, b: badgeHtml(r), t: `${esc(kindLabel(r))} ${esc(r.s)} hacia ${esc(headOf(l))}`,
           s: `Sube en ${esc(net.name[l.from])} · baja en ${esc(net.name[l.to])} · ${n} ${n === 1 ? "parada" : "paradas"} · pasa cada ~${Math.round(l.hw)} min${payText(l, r)}`,
           m: fmtDur(l.sec + l.wait) });
       }
@@ -556,6 +556,26 @@
     return out;
   }
   P.stepsFor = stepsFor;
+
+  // ---------- Cambiar de bus en otra estación ----------
+  // Para el bus op.legs[i], otras estaciones donde se puede hacer el mismo cambio (máx. 10 min más)
+  function altList(op, i, afterPos) {
+    const net = P.net;
+    return net.altTransfers(op, i, 600)
+      .filter(a => afterPos == null || a.pos > afterPos)
+      .map(a => { const nop = net.withTransfer(op, i, a); return { a, nop, extra: nop.total - op.total, extraCost: (nop.cost || 0) - (op.cost || 0) }; })
+      .filter(x => x.extra <= 600)
+      .slice(0, 6);
+  }
+  function extraTxt(sec) { const m = Math.round(sec / 60); return m <= -1 ? `${-m} min antes` : m >= 1 ? `+${m} min` : "mismo tiempo"; }
+  function altHtml(list) {
+    const net = P.net;
+    return list.map((x, k) => {
+      const r = net.routes[x.a.route];
+      return `<button type="button" class="altx" data-k="${k}"><span class="tx"><b>${esc(stopLabel(x.a.from).replace(/^la e/, "E").replace(/^el p/, "P"))}</b><small>Ahí tomas ${badgeHtml(r)}</small></span><span class="dx ${x.extra <= 60 ? "good" : ""}">${extraTxt(x.extra)}${x.extraCost > 0 ? `<small>+${money(x.extraCost)}</small>` : ""}</span></button>`;
+    }).join("");
+  }
+  P.altList = altList; P.altHtml = altHtml; P.extraTxt = extraTxt;
 
   function renderResults() {
     const box = $("results"), net = P.net;
@@ -623,7 +643,26 @@
     $("otitle").textContent = `${origin.name} → ${dest.name}`;
     $("osum").innerHTML = summaryHtml(op, base, detailTag);
     if (P.ostartLabel) P.ostartLabel();
-    $("osteps").innerHTML = stepsFor(op).map(s => `<li>${s.b}<div class="t">${s.t}<small>${s.s}</small></div><span class="m">${s.m}</span></li>`).join("");
+    const alts = {};
+    $("osteps").innerHTML = stepsFor(op).map(st => {
+      let html = `<li>${st.b}<div class="t">${st.t}<small>${st.s}</small></div><span class="m">${st.m}</span></li>`;
+      if (st.leg != null) {
+        const list = altList(op, st.leg);
+        if (list.length) {
+          alts[st.leg] = list;
+          const r = P.net.routes[op.legs[st.leg].route];
+          html += `<li class="alts" data-leg="${st.leg}"><details><summary>¿Prefieres cambiar de bus en otra estación?<small>${list.length} ${list.length === 1 ? "opción" : "opciones"} sin salir de la ${esc(r.s)}</small></summary><div class="altlist">${altHtml(list)}</div></details></li>`;
+        }
+      }
+      return html;
+    }).join("");
+    $("osteps").querySelectorAll(".alts").forEach(li => li.addEventListener("click", e => {
+      const b = e.target.closest(".altx"); if (!b) return;
+      const x = alts[li.dataset.leg][+b.dataset.k]; if (!x) return;
+      options[selected] = x.nop;
+      renderDetail(); drawPreview(); loadWalks();
+      note("");
+    }));
   }
   $("opage-back").addEventListener("click", () => popLayer());
   $("ostart").addEventListener("click", () => {

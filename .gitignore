@@ -6,3 +6,4 @@ local.properties
 *.iml
 app/src/main/assets/www/data/network.json
 app/src/main/assets/www/vendor/
+tools/__pycache__/

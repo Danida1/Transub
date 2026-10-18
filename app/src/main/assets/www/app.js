@@ -121,6 +121,8 @@
   let origin = null, dest = null, options = [], selected = -1, searchIndex = [], planWhen = null;
 
   async function load() {
+    // Cruces de calles para ubicar direcciones con precisión (se carga aparte para no demorar las rutas)
+    fetch("data/streets.json").then(r => r.ok ? r.json() : null).then(j => Geo.setStreets(j)).catch(() => {});
     try {
       const r = await fetch("data/network.json");
       if (!r.ok) throw new Error("HTTP " + r.status);
@@ -230,8 +232,11 @@
       $("sres").innerHTML = html; return;
     }
     if ("mi ubicacion".startsWith(q)) { html += rowHtml(gpsItem, items.length); items.push(gpsItem); }
-    const addr = Geo.parseAddress(v);
-    if (addr) { html += '<div class="grp">Dirección</div>' + rowHtml(Object.assign({ sub: "Ubicación aproximada por la cuadrícula vial" }, addr), items.length); items.push(addr); }
+    const addrs = Geo.parseAddressAll(v);
+    if (addrs.length) {
+      html += '<div class="grp">Dirección</div>';
+      addrs.forEach(a => { html += rowHtml(Object.assign({}, a, { sub: a.sub || "Ubicada sobre el mapa de calles" }), items.length); items.push(a); });
+    }
     if (P.net && q.length >= 2) {
       const hits = searchIndex.filter(p => p.key.includes(q))
         .sort((a, b) => (a.key.indexOf(q) - b.key.indexOf(q)) || (a.ic === "station" ? -1 : 1) || a.name.length - b.name.length).slice(0, 8);

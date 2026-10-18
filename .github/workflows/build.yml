@@ -25,6 +25,13 @@ jobs:
       - name: Descargar el GTFS oficial (SIMUR) y preparar los datos
         run: python tools/build_data.py
 
+      - name: Actualizar el mapa de calles para ubicar direcciones (OpenStreetMap)
+        continue-on-error: true
+        timeout-minutes: 25
+        run: |
+          python tools/fetch_osm.py osm streets,boundary
+          python tools/build_streets.py osm/streets.json.gz app/src/main/assets/www/data/streets.json osm/boundary.json.gz
+
       - name: Descargar el mapa (Leaflet) para que funcione sin depender de internet
         run: |
           mkdir -p app/src/main/assets/www/vendor

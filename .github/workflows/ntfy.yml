@@ -2,16 +2,27 @@ name: Prueba ntfy (temporal)
 on:
   push:
     branches: [ntfy-test]
+permissions:
+  contents: write
 jobs:
   t:
     runs-on: ubuntu-latest
     steps:
       - run: |
           T=transub-prueba-$RANDOM$RANDOM
+          {
           echo "topic $T"
-          curl -s -i -X POST -d '{"k":"r","t":"manif","la":4.6297,"lo":-74.1729,"d":"abc","v":30}' https://ntfy.sh/$T | head -30
+          curl -s -i -X POST -d '{"k":"r","t":"manif","la":4.6297,"lo":-74.1729,"d":"abcdefghij","v":1}' https://ntfy.sh/$T
           sleep 2
-          echo "--- poll"
-          curl -s -i "https://ntfy.sh/$T/json?poll=1&since=1h" -H "Origin: https://appassets.androidplatform.net" | head -30
-          echo "--- options"
-          curl -s -i -X OPTIONS "https://ntfy.sh/$T" -H "Origin: https://appassets.androidplatform.net" -H "Access-Control-Request-Method: POST" | head -20
+          echo; echo "--- poll"
+          curl -s -i "https://ntfy.sh/$T/json?poll=1&since=1h" -H "Origin: https://appassets.androidplatform.net"
+          echo; echo "--- options"
+          curl -s -i -X OPTIONS "https://ntfy.sh/$T" -H "Origin: https://appassets.androidplatform.net" -H "Access-Control-Request-Method: POST"
+          } > ntfy.txt 2>&1
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ntfy-tmp
+          name: ntfy-tmp
+          prerelease: true
+          target_commitish: ntfy-test
+          files: ntfy.txt

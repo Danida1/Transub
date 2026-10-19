@@ -1,0 +1,17 @@
+name: Prueba ntfy (temporal)
+on:
+  push:
+    branches: [ntfy-test]
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          T=transub-prueba-$RANDOM$RANDOM
+          echo "topic $T"
+          curl -s -i -X POST -d '{"k":"r","t":"manif","la":4.6297,"lo":-74.1729,"d":"abc","v":30}' https://ntfy.sh/$T | head -30
+          sleep 2
+          echo "--- poll"
+          curl -s -i "https://ntfy.sh/$T/json?poll=1&since=1h" -H "Origin: https://appassets.androidplatform.net" | head -30
+          echo "--- options"
+          curl -s -i -X OPTIONS "https://ntfy.sh/$T" -H "Origin: https://appassets.androidplatform.net" -H "Access-Control-Request-Method: POST" | head -20

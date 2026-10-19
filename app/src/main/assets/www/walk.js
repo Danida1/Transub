@@ -22,6 +22,17 @@
     return fetch(url).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); });
   }
   P.httpGet = httpGet;
+  function httpPost(url, data) {
+    if (window.Android && Android.httpPost) {
+      return new Promise((res, rej) => {
+        const id = ++seq; pending[id] = { res, rej };
+        Android.httpPost(id, url, data);
+        setTimeout(() => { if (pending[id]) { delete pending[id]; rej(new Error("timeout")); } }, 15000);
+      });
+    }
+    return fetch(url, { method: "POST", body: data }).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); });
+  }
+  P.httpPost = httpPost;
   // Enlace corto de Google Maps -> { url final, inicio de la página }
   P.resolveMaps = function (url) {
     if (!(window.Android && Android.resolveMaps)) return Promise.reject(new Error("solo en la app"));

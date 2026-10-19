@@ -452,7 +452,8 @@
     setTimeout(() => {
       options = P.net.plan(origin, dest, planWhen || new Date(), personal(), mode); selected = -1;
       renderResults(); drawPreview();
-      requestAnimationFrame(toResults);   // ya con las opciones, la página es más larga
+      requestAnimationFrame(toResults);
+      if (P.refreshReports) P.refreshReports(false);   // ya con las opciones, la página es más larga
     }, 30);
   }
 
@@ -564,6 +565,8 @@
   function stopLabel(s) { return (P.net.isStation[s] ? "la estación " : "el paradero ") + P.net.name[s]; }
   function headOf(l) { const p = P.net.pats[l.pat]; return p.h || P.net.routes[p.r].l || P.net.name[p.s[p.s.length - 1]]; }
   P.headOf = headOf; P.stopLabel = stopLabel;
+  let toastT = null;
+  P.toast = t => { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3500); };
 
   const money = v => v ? "$" + v.toLocaleString("es-CO") : "Gratis";
   P.money = money;
@@ -673,7 +676,7 @@
     }).join("");
     return `<div class="opt-top"><span class="dur">${durHtml(op.total)}</span><span class="arr">Llegas ${fmtTime(new Date(base.getTime() + op.total * 1000))}</span>${tag || ""}</div>
       <div class="strip" aria-hidden="true">${strip}</div>
-      <div class="meta"><span class="cost"><b>${money(op.cost || 0)}</b>${op.fares > 1 ? ` · ${op.fares} pasajes` : op.fares === 1 ? " · 1 pasaje" : ""}</span><span><b>${Math.max(0, rides.length - 1)}</b> ${rides.length - 1 === 1 ? "cambio de bus" : "cambios de bus"}</span><span><b>${meters(walkM)}</b> a pie</span>${rides.length ? "" : "<span>Sin bus</span>"}</div>`;
+      <div class="meta"><span class="cost"><b>${money(op.cost || 0)}</b>${op.fares > 1 ? ` · ${op.fares} pasajes` : op.fares === 1 ? " · 1 pasaje" : ""}</span><span><b>${Math.max(0, rides.length - 1)}</b> ${rides.length - 1 === 1 ? "cambio de bus" : "cambios de bus"}</span><span><b>${meters(walkM)}</b> a pie</span>${rides.length ? "" : "<span>Sin bus</span>"}</div>${P.reportBadgeHtml ? P.reportBadgeHtml(op) : ""}`;
   }
 
   // ---------- Pantalla de detalle de una opción: mapa grande arriba, pasos abajo ----------
@@ -684,6 +687,11 @@
     pushLayer(() => { $("opage").hidden = true; selected = -1; });
     renderDetail(); drawPreview(); loadWalks();
   }
+  // Cuando llegan reportes nuevos, se actualizan las opciones en pantalla
+  P.onReports = () => {
+    if (options.length && !$("opth").hidden) { const y = window.scrollY; renderResults(); window.scrollTo(0, y); }
+    if (selected >= 0 && !$("opage").hidden) renderDetail();
+  };
   function renderDetail() {
     const op = options[selected]; if (!op) return;
     const base = planWhen || new Date();

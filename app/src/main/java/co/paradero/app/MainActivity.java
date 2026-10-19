@@ -299,6 +299,35 @@ public class MainActivity extends Activity {
 
             // Descarga de rutas a pie y lugares (solo a estos servidores) sin las restricciones del navegador
             @JavascriptInterface
+            // Reportes de la comunidad: solo se envían a ntfy.sh (mensajes con formato fijo, sin texto libre)
+            public void httpPost(final int id, final String url, final String data) {
+                new Thread(() -> {
+                    boolean ok = false;
+                    String body;
+                    try {
+                        Uri u = Uri.parse(url);
+                        if (!"https".equals(u.getScheme()) || !"ntfy.sh".equals(u.getHost()) || data == null || data.length() > 400)
+                            throw new Exception("no permitido");
+                        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                        c.setConnectTimeout(10000);
+                        c.setReadTimeout(12000);
+                        c.setRequestMethod("POST");
+                        c.setDoOutput(true);
+                        c.setRequestProperty("User-Agent", "Transub/1.0");
+                        try (OutputStream o = c.getOutputStream()) { o.write(data.getBytes("UTF-8")); }
+                        int code = c.getResponseCode();
+                        body = "HTTP " + code;
+                        ok = code < 400;
+                        c.disconnect();
+                    } catch (Exception e) {
+                        body = String.valueOf(e.getMessage());
+                    }
+                    final String js = "window.__nativeHttp&&window.__nativeHttp(" + id + "," + ok + "," + JSONObject.quote(body) + ")";
+                    web.post(() -> web.evaluateJavascript(js, null));
+                }).start();
+            }
+
+            @JavascriptInterface
             public void httpGet(final int id, final String url) {
                 new Thread(() -> {
                     boolean ok = false;
@@ -307,7 +336,7 @@ public class MainActivity extends Activity {
                         Uri u = Uri.parse(url);
                         String h = u.getHost();
                         if (!"https".equals(u.getScheme()) || h == null
-                                || !(h.equals("routing.openstreetmap.de") || h.equals("photon.komoot.io") || h.equals("nominatim.openstreetmap.org") || h.equals("news.google.com"))) {
+                                || !(h.equals("routing.openstreetmap.de") || h.equals("photon.komoot.io") || h.equals("nominatim.openstreetmap.org") || h.equals("news.google.com") || h.equals("ntfy.sh"))) {
                             throw new Exception("servidor no permitido");
                         }
                         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();

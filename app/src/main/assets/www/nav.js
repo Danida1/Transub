@@ -297,6 +297,13 @@
     drawTrip(false); render(P.gps.pos || null); save(); refreshAltBtn();
   }
 
+  // Reportar desde el viaje: propone la estación por la que vas
+  $("nav-rep").addEventListener("click", () => {
+    let pref = null;
+    if (trip) { const l = trip.legs[trip.cur].l; pref = l.kind === "ride" ? l.to : l.to != null ? l.to : null; }
+    if (P.openReport) P.openReport(pref);
+  });
+
   $("nav-close").addEventListener("click", () => P.popLayer());     // salir del mapa (el viaje sigue)
   $("nav-end").addEventListener("click", () => endTrip(false));    // terminar el viaje
   $("recenter").addEventListener("click", () => {

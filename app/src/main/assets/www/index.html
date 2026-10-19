@@ -365,6 +365,26 @@ body.has-trip .obody{padding-bottom:96px!important}
 .updnotes ul{margin:0;padding-left:18px}.updnotes li{margin:3px 0}
 .updbar{height:10px;border-radius:99px;background:var(--sunk);overflow:hidden;margin-top:14px}
 .updbar span{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.repopen{width:100%;flex:none;margin:6px 0 12px}
+.replist{display:grid;gap:10px;margin-bottom:22px}
+.rep{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:12px 14px}
+.rep .racts{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+.rep .racts .chipbtn{color:var(--ink)}
+.rtype{font-size:12.5px;font-weight:700;border-radius:999px;padding:5px 10px;color:#fff;white-space:nowrap}
+.t-retraso{background:#C9822B}.t-trancon{background:#B5543A}.t-manif{background:#8E3F8F}.t-cierre{background:#5B6770}
+.rep .rtx b{display:block;font-size:15.5px}.rep .rtx small{color:var(--muted);font-size:13px}
+.reptypes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.reptypes button{display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:12px;font-weight:600;font-size:15px;text-align:left}
+.reptypes button i{width:12px;height:12px;border-radius:50%;flex:none}
+.reptypes button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.repwhere{display:grid;gap:6px;max-height:32vh;overflow:auto}
+.rwhere{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 12px;text-align:left}
+.rwhere b{font-size:15px}.rwhere small{color:var(--muted);font-size:13px;white-space:nowrap}
+.rwhere.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.rwarn{margin-top:10px;border-radius:10px;padding:8px 10px;background:color-mix(in srgb,#B5543A 12%,var(--surface));border-left:4px solid #B5543A;text-align:left}
+.rwarn b{display:block;font-size:14px;color:#B5543A}.rwarn small{display:block;font-size:13px;color:var(--ink)}
+.navrep{background:var(--surface)!important;color:var(--ink)!important;margin-right:8px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:2400;background:#16191A;color:#fff;border-radius:12px;padding:12px 14px;font-size:14.5px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 </style>
 </head>
 <body>
@@ -433,6 +453,11 @@ body.has-trip .obody{padding-bottom:96px!important}
 
   <!-- NOVEDADES -->
   <section id="view-nov" class="view" hidden>
+    <div class="sec-h"><h2>Reportes de la comunidad</h2></div>
+    <p class="fine">Lo que otras personas reportaron en las últimas horas. Si una ruta pasa por ahí, Transub te avisa al buscar.</p>
+    <button type="button" class="go repopen" id="rep-open">Reportar un problema</button>
+    <div class="replist" id="replist"><p class="fine">Cargando reportes…</p></div>
+
     <div class="sec-h"><h2>Publicaciones en X</h2></div>
     <p class="fine" id="xstate">Lo último que publican sobre cierres, desvíos y manifestaciones. Se abre dentro de Transub.</p>
     <div class="xcards" id="xcards">
@@ -551,7 +576,7 @@ body.has-trip .obody{padding-bottom:96px!important}
     <button class="recenter" id="recenter" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Seguirme</button>
     <div class="navmsg" id="navmsg" hidden></div>
     <button class="navalt-btn" id="nav-alt" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg> Cambiar de bus en otra estación</button>
-    <div class="eta"><div><span class="big" id="eta-dur"></span><small id="eta-time"></small></div><button class="stop" id="nav-end">Terminar</button></div>
+    <div class="eta"><div><span class="big" id="eta-dur"></span><small id="eta-time"></small></div><button class="stop navrep" id="nav-rep">Reportar</button><button class="stop" id="nav-end">Terminar</button></div>
   </div>
 </div>
 
@@ -572,6 +597,26 @@ body.has-trip .obody{padding-bottom:96px!important}
     <button type="button" class="linkbtn" id="rs-end" style="margin-top:12px;align-self:center;padding:8px 14px">Terminar ese viaje</button>
   </div>
 </div>
+
+<div class="modal" id="repSheet" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="rep-title">
+    <h3 id="rep-title">¿Qué está pasando?</h3>
+    <div class="reptypes" id="rep-types">
+      <button type="button" data-t="retraso"><i class="t-retraso"></i>Retraso</button>
+      <button type="button" data-t="trancon"><i class="t-trancon"></i>Trancón</button>
+      <button type="button" data-t="manif"><i class="t-manif"></i>Manifestación</button>
+      <button type="button" data-t="cierre"><i class="t-cierre"></i>Estación cerrada</button>
+    </div>
+    <div class="grp" style="margin:14px 0 6px">¿Dónde?</div>
+    <div class="repwhere" id="rep-where"></div>
+    <p class="wdesc" id="rep-msg" hidden style="margin:10px 0 0"></p>
+    <p class="fine" style="margin:10px 0 0">El reporte es anónimo y se borra solo en un par de horas.</p>
+    <button type="button" class="go" id="rep-send" style="margin-top:12px" disabled>Enviar reporte</button>
+    <button type="button" class="linkbtn" id="rep-cancel" style="margin-top:8px;align-self:center;padding:8px 14px">Cancelar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
 
 <div class="modal" id="updSheet" hidden>
   <div class="modal-card" role="dialog" aria-labelledby="upd-title">
@@ -604,5 +649,6 @@ body.has-trip .obody{padding-bottom:96px!important}
 <script src="lines.js"></script>
 <script src="news.js"></script>
 <script src="update.js"></script>
+<script src="reports.js"></script>
 </body>
 </html>

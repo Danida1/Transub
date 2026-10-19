@@ -294,8 +294,21 @@
     try { if (nativeTrip && window.Android && Android.startTrip) Android.startTrip(JSON.stringify(tripAlerts(rest, trip.dest)), voiceOn()); } catch (e) {}
     const l = nop.legs[legIdx], nx = nop.legs.slice(legIdx + 1).find(z => z.kind === "ride");
     say("alt" + Date.now(), `Listo. Bájate en ${P.net.name[l.to]} y toma la ruta ${spell(P.net.routes[nx.route].s)}.`);
-    drawTrip(false); render(P.gps.pos || null); save(); refreshAltBtn();
+    drawTrip(false); render(P.gps.pos || null); save(); refreshAltBtn(); renderSteps();
   }
+
+  // Paso a paso dentro del viaje, con el paso actual resaltado
+  function renderSteps() {
+    const box = $("navsteps"); if (!trip || box.hidden) return;
+    const cur = trip.op.legs.indexOf(trip.legs[trip.cur].l);
+    box.innerHTML = P.stepsFor(trip.op).map(st => `<li class="${st.i === cur ? "cur" : st.i < cur ? "done" : ""}">${st.b}<div class="t">${st.t}<small>${st.s}</small></div><span class="m">${st.m}</span></li>`).join("");
+    const c = box.querySelector(".cur"); if (c && !box.dataset.scrolled) { box.dataset.scrolled = 1; c.scrollIntoView({ block: "nearest" }); }
+  }
+  $("nav-steps").addEventListener("click", () => {
+    const box = $("navsteps"); box.hidden = !box.hidden; delete box.dataset.scrolled;
+    $("nav-steps").classList.toggle("on", !box.hidden); $("nav-steps").textContent = box.hidden ? "Ver pasos" : "Ocultar pasos";
+    renderSteps();
+  });
 
   // Reportar desde el viaje: propone la estación por la que vas
   $("nav-rep").addEventListener("click", () => {
@@ -395,6 +408,7 @@
       else { title = "Bájate en " + net.name[l.to]; sub = "Faltan " + left + " paradas · " + P.kindLabel(r) + " " + r.s; }
     }
     $("instr").innerHTML = `${badge}<div><b>${esc(title)}</b><small>${esc(sub)}</small></div>`;
+    if (trip.stepsCur !== trip.cur) { trip.stepsCur = trip.cur; renderSteps(); }
     if (!trip.altAt || Date.now() - trip.altAt > 20000 || trip.altCur !== trip.cur) { trip.altAt = Date.now(); trip.altCur = trip.cur; refreshAltBtn(); }
     // tiempo restante
     let rem = 0;

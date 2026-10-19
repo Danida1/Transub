@@ -578,7 +578,7 @@
     const F = money(Router.Network.FARE);
     if (l.pay === "full") return r.k === "A" ? ` · <b>pagas ${F}</b> al entrar al portal` : ` · <b>pagas ${F}</b>`;
     if (l.pay === "free") return ` · <b>pagas ${F}</b>`;
-    if (l.pay === "inside") return " · sin pagar otra vez: sigues dentro de la estación";
+    if (l.pay === "inside") return "";
     if (l.pay === "alim") return " · alimentador sin costo";
     return "";
   }
@@ -592,13 +592,13 @@
       if (l.kind === "walk") {
         if (l.meters < 40 && op.legs.length > 1) return;
         const target = l.toPoint ? (i === op.legs.length - 1 ? "tu destino" : l.toPoint.name) : stopLabel(l.to);
-        out.push({ b: '<span class="badge walk">A PIE</span>', t: `Camina hasta ${esc(target)}`, s: meters(l.walk ? l.walk.dist : l.meters) + turnsHtml(l), m: fmtDur(l.walk ? l.walk.dur : l.sec) });
+        out.push({ i, b: '<span class="badge walk">A PIE</span>', t: `Camina hasta ${esc(target)}`, s: meters(l.walk ? l.walk.dist : l.meters) + turnsHtml(l), m: fmtDur(l.walk ? l.walk.dur : l.sec) });
       } else if (l.kind === "xfer") {
         const same = net.parent[l.from] >= 0 && net.parent[l.from] === net.parent[l.to];
-        out.push({ b: '<span class="badge walk">CAMBIO</span>', t: same ? `Cambia de vagón en ${esc(stopLabel(l.to))}` : `Camina hasta ${esc(stopLabel(l.to))}`, s: same ? "Dentro de la misma estación" : meters(l.walk ? l.walk.dist : l.meters) + turnsHtml(l), m: fmtDur(l.sec) });
+        out.push({ i, b: '<span class="badge walk">CAMBIO</span>', t: same ? `Cambia de vagón en ${esc(stopLabel(l.to))}` : `Camina hasta ${esc(stopLabel(l.to))}`, s: same ? "Dentro de la misma estación" : meters(l.walk ? l.walk.dist : l.meters) + turnsHtml(l), m: fmtDur(l.sec) });
       } else {
         const r = net.routes[l.route], n = l.apos - l.bpos;
-        out.push({ leg: i, b: badgeHtml(r), t: `${esc(kindLabel(r))} ${esc(r.s)} hacia ${esc(headOf(l))}`,
+        out.push({ i, leg: i, b: badgeHtml(r), t: `${esc(kindLabel(r))} ${esc(r.s)} hacia ${esc(headOf(l))}`,
           s: `Sube en ${esc(net.name[l.from])} · baja en ${esc(net.name[l.to])} · ${n} ${n === 1 ? "parada" : "paradas"} · pasa cada ~${Math.round(l.hw)} min${payText(l, r)}`,
           m: fmtDur(l.sec + l.wait) });
       }

@@ -207,9 +207,19 @@ button{cursor:pointer}
 .nav-bottom>*{pointer-events:auto}
 .recenter{align-self:flex-end;display:flex;align-items:center;gap:8px;border:0;background:var(--surface);color:var(--ink);border-radius:999px;padding:12px 16px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 .recenter svg{width:20px;height:20px}
-.eta{background:var(--surface);border-radius:16px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;box-shadow:0 -2px 14px rgba(0,0,0,.12)}
-.eta .big{font-family:var(--f-num);font-weight:600;font-size:22px}
-.eta small{display:block;color:var(--muted);font-size:13px}
+.eta{background:var(--surface);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 -2px 14px rgba(0,0,0,.12)}
+.eta-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.eta .big{font-family:var(--f-num);font-weight:600;font-size:24px;white-space:nowrap}
+.eta small{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eta-acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.eta-acts .stop{padding:11px 6px!important;font-size:15px;white-space:nowrap}
+.eta-acts .stop.on{background:var(--btn);color:var(--accent-ink)}
+.eta-acts .end{background:color-mix(in srgb,var(--dest) 18%,var(--sunk))!important}
+.navsteps{max-height:38vh;overflow:auto;margin:0;padding:0 2px 2px;border-bottom:1px solid var(--line)}
+.navsteps>li.cur{background:color-mix(in srgb,var(--btn) 16%,transparent);border-radius:10px}
+.navsteps>li.done{opacity:.45}
+.navsteps small{white-space:normal!important;overflow:visible!important;font-size:13px}
+.navsteps>li.cur{padding-left:6px;padding-right:6px}
 .eta .stop{border:0;background:var(--sunk);border-radius:999px;padding:11px 16px;font-weight:700}
 .navmsg{background:var(--surface);border-radius:12px;padding:10px 14px;font-size:14px;color:var(--muted);box-shadow:0 2px 10px rgba(0,0,0,.12)}
 
@@ -383,7 +393,6 @@ body.has-trip .obody{padding-bottom:96px!important}
 .rwhere.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
 .rwarn{margin-top:10px;border-radius:10px;padding:8px 10px;background:color-mix(in srgb,#B5543A 12%,var(--surface));border-left:4px solid #B5543A;text-align:left}
 .rwarn b{display:block;font-size:14px;color:#B5543A}.rwarn small{display:block;font-size:13px;color:var(--ink)}
-.navrep{background:var(--surface)!important;color:var(--ink)!important;margin-right:8px}
 .toast{position:fixed;left:16px;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:2400;background:#16191A;color:#fff;border-radius:12px;padding:12px 14px;font-size:14.5px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 
 /* Animación de inicio */
@@ -613,7 +622,11 @@ body.has-trip .obody{padding-bottom:96px!important}
     <button class="recenter" id="recenter" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Seguirme</button>
     <div class="navmsg" id="navmsg" hidden></div>
     <button class="navalt-btn" id="nav-alt" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg> Cambiar de bus en otra estación</button>
-    <div class="eta"><div><span class="big" id="eta-dur"></span><small id="eta-time"></small></div><button class="stop navrep" id="nav-rep">Reportar</button><button class="stop" id="nav-end">Terminar</button></div>
+    <div class="eta">
+      <ol class="steps navsteps" id="navsteps" hidden></ol>
+      <div class="eta-top"><span class="big" id="eta-dur"></span><small id="eta-time"></small></div>
+      <div class="eta-acts"><button class="stop" id="nav-steps">Ver pasos</button><button class="stop" id="nav-rep">Reportar</button><button class="stop end" id="nav-end">Terminar</button></div>
+    </div>
   </div>
 </div>
 

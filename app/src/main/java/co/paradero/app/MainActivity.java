@@ -526,7 +526,7 @@ public class MainActivity extends Activity {
         if (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme())) return;
         try {
             CustomTabColorSchemeParams colors = new CustomTabColorSchemeParams.Builder()
-                    .setToolbarColor(0xFF2B7F77).build();
+                    .setToolbarColor(0xFF8F5214).build();
             CustomTabsIntent tab = new CustomTabsIntent.Builder()
                     .setDefaultColorSchemeParams(colors)
                     .setShowTitle(true)

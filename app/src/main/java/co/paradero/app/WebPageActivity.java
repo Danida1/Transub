@@ -101,7 +101,7 @@ public class WebPageActivity extends Activity {
         boolean feed = "feed".equals(mode);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF2B7F77);
+        root.setBackgroundColor(0xFF8F5214);
         web = new WebView(this);
         if (feed) {
             String u0 = getIntent().getStringExtra("url");
@@ -174,7 +174,7 @@ public class WebPageActivity extends Activity {
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(4), dp(6), dp(8), dp(8));
-        bar.setBackgroundColor(0xFF2B7F77);
+        bar.setBackgroundColor(0xFF8F5214);
 
         TextView back = new TextView(this);
         back.setText("\u2039");
@@ -218,7 +218,7 @@ public class WebPageActivity extends Activity {
             bg.setCornerRadius(dp(999));
             bg.setColor(on ? Color.WHITE : 0x33FFFFFF);
             c.setBackground(bg);
-            c.setTextColor(on ? 0xFF2B7F77 : Color.WHITE);
+            c.setTextColor(on ? 0xFF8F5214 : Color.WHITE);
         }
     }
 

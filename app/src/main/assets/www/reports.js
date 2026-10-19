@@ -121,10 +121,11 @@
   function renderList() {
     const box = $("replist"); if (!box) return;
     if (!reports.length) { box.innerHTML = '<p class="fine">No hay reportes en las últimas horas.</p>'; return; }
-    box.innerHTML = reports.map((r, i) => `<div class="rep">
+    // Solo lectura: notas cortas de lo que reportaron otras personas durante su viaje
+    const verb = { retraso: "buses con retraso", trancon: "trancón", manif: "una manifestación", cierre: "la estación o paradero cerrado" };
+    box.innerHTML = reports.map(r => `<div class="rep">
       <span class="rtype t-${r.type}">${esc(TYPES[r.type].label)}</span>
-      <div class="rtx"><b>${esc(label(r.stop))}</b><small>${esc(ago(r.last))} · ${r.count === 1 ? "1 persona lo reportó" : r.count + " personas lo reportaron"}</small></div>
-      <div class="racts"><button type="button" class="chipbtn" data-i="${i}" data-a="r">Sigue así</button><button type="button" class="chipbtn" data-i="${i}" data-a="ok">Ya se normalizó</button></div>
+      <div class="rtx"><b>${r.count === 1 ? "Una persona reportó" : r.count + " personas reportaron"} ${esc(verb[r.type])} en ${esc(label(r.stop))}</b><small>${esc(ago(r.last))}</small></div>
     </div>`).join("");
   }
   document.addEventListener("click", e => {
@@ -179,7 +180,7 @@
       .catch(err => { $("rep-msg").hidden = false; $("rep-msg").textContent = err.message && err.message.length < 120 && !/HTTP|timeout|fetch/i.test(err.message) ? err.message : "No se pudo enviar. Revisa tu conexión e intenta otra vez."; ready(); })
       .finally(() => { $("rep-send").textContent = "Enviar reporte"; });
   });
-  $("rep-open").addEventListener("click", () => openSheet(null));
+  if ($("rep-open")) $("rep-open").addEventListener("click", () => openSheet(null));
 
   // Revisa al abrir, al volver a la app y cada 2 minutos mientras se usa
   window.addEventListener("network", () => refresh(true));

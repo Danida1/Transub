@@ -64,6 +64,8 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: Transub 1.0.${{ github.run_number }}
           body: |
+            ${{ github.event.head_commit.message }}
+
             APK lista para instalar en Android 8 o superior.
             Descarga Transub.apk desde el teléfono y ábrela para instalarla.
             Rutas y paraderos: GTFS oficial de Bogotá (SIMUR), descargado al compilar esta versión.

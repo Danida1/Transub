@@ -355,6 +355,16 @@ body.has-trip .obody{padding-bottom:96px!important}
 .navalt-btn svg{width:20px;height:20px;color:var(--accent)}
 #navalt .msheet{max-height:75vh;overflow:auto}
 #navalt .mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.pick em.near{display:block;font-style:normal;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.updpill{display:flex;align-items:center;gap:8px;margin:12px 0 0;width:100%;justify-content:center;border:1.5px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent);font-weight:700;font-size:14.5px;border-radius:999px;padding:9px 14px}
+.updpill i{width:9px;height:9px;border-radius:50%;background:#F5A524;box-shadow:0 0 0 3px color-mix(in srgb,#F5A524 30%,transparent)}
+.brand .mark{position:relative}
+.has-upd .brand{position:relative}
+.has-upd .brand::after{content:"";position:absolute;left:31px;top:-5px;width:12px;height:12px;border-radius:50%;background:#F5A524;border:2px solid var(--bg)}
+.updnotes{font-size:14.5px;color:var(--ink);max-height:30vh;overflow:auto;background:var(--sunk);border-radius:12px;padding:10px 14px}
+.updnotes ul{margin:0;padding-left:18px}.updnotes li{margin:3px 0}
+.updbar{height:10px;border-radius:99px;background:var(--sunk);overflow:hidden;margin-top:14px}
+.updbar span{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
 </style>
 </head>
 <body>
@@ -366,6 +376,7 @@ body.has-trip .obody{padding-bottom:96px!important}
     </div>
     <div class="clock"><b id="daytype"></b><span id="clock"></span></div>
   </header>
+  <button type="button" class="updpill" id="updpill" hidden><i></i>Actualización pendiente · <u>Actualizar</u></button>
 
   <!-- RUTAS -->
   <section id="view-rutas" class="view">
@@ -562,6 +573,18 @@ body.has-trip .obody{padding-bottom:96px!important}
   </div>
 </div>
 
+<div class="modal" id="updSheet" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="upd-title">
+    <h3 id="upd-title">Hay una versión nueva</h3>
+    <p class="wdesc" id="upd-ver" style="margin:2px 0 10px"></p>
+    <div class="updnotes" id="upd-notes"></div>
+    <div class="updbar" id="upd-bar" hidden><span id="upd-fill"></span></div>
+    <p class="wdesc" id="upd-msg" hidden style="margin:8px 0 0"></p>
+    <button type="button" class="go" id="upd-go" style="margin-top:14px">Actualizar ahora</button>
+    <button type="button" class="linkbtn" id="upd-later" style="margin-top:10px;align-self:center;padding:8px 14px">Más tarde</button>
+  </div>
+</div>
+
 <button class="tripbar" id="tripbar" hidden><span class="tb-dot" aria-hidden="true"></span><span class="tb-tx"><b id="tb-title">Viaje en curso</b><small id="tb-sub">Toca para ver el mapa</small></span><em>Ver</em></button>
 
 <nav class="tabs" aria-label="Secciones">
@@ -580,5 +603,6 @@ body.has-trip .obody{padding-bottom:96px!important}
 <script src="nav.js"></script>
 <script src="lines.js"></script>
 <script src="news.js"></script>
+<script src="update.js"></script>
 </body>
 </html>

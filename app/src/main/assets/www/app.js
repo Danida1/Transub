@@ -39,20 +39,36 @@
   window.addEventListener("popstate", () => { const close = layers.pop(); if (close) close(); });
 
   // ---------- GPS compartido ----------
-  const gps = { pos: null, subs: new Set(), watching: false, denied: false };
-  function startGps() {
-    if (gps.watching || !navigator.geolocation) return;
+  const gps = { pos: null, subs: new Set(), watching: false, denied: false, id: null };
+  function gotPos(p) {
+    gps.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, t: Date.now() };
+    gps.denied = false;
+    gps.subs.forEach(f => f(gps.pos));
+  }
+  function startGps(restart) {
+    if (!navigator.geolocation) return;
+    if (gps.watching && !restart) return;
+    if (gps.id != null) { try { navigator.geolocation.clearWatch(gps.id); } catch (e) {} gps.id = null; }
     gps.watching = true;
-    navigator.geolocation.watchPosition(p => {
-      gps.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, t: Date.now() };
-      gps.denied = false;
-      gps.subs.forEach(f => f(gps.pos));
-    }, err => {
+    gps.id = navigator.geolocation.watchPosition(gotPos, err => {
       if (err.code === 1) { gps.denied = true; gps.watching = false; }
       gps.subs.forEach(f => f(null, err));
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
   }
   function onGps(f) { gps.subs.add(f); return () => gps.subs.delete(f); }
+  // Posición actual de verdad (no la de hace rato): si la última lectura es vieja, pide una nueva
+  function freshGps(maxAge) {
+    return new Promise(resolve => {
+      if (gps.pos && Date.now() - gps.pos.t < (maxAge || 20000)) return resolve(gps.pos);
+      if (!navigator.geolocation) return resolve(gps.pos);
+      let done = false;
+      const finish = p => { if (!done) { done = true; resolve(p); } };
+      navigator.geolocation.getCurrentPosition(p => { gotPos(p); finish(gps.pos); }, () => finish(gps.pos), { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 });
+      setTimeout(() => finish(gps.pos), 13000);
+    });
+  }
+  // Al volver a la app, el GPS se reinicia (Android a veces lo deja dormido en segundo plano)
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && gps.watching) startGps(true); });
 
   // ---------- Mapas ----------
   function leafletReady(cb) { if (window.L) cb(); else window.addEventListener("leaflet", cb, { once: true }); }
@@ -114,7 +130,7 @@
     }
   }
 
-  const P = window.P = { stopDots, $, css, esc, fmtTime, fmtMin, fmtDur, durHtml, meters, store, ICON, pushLayer, popLayer, gps, startGps, onGps,
+  const P = window.P = { stopDots, $, css, esc, fmtTime, fmtMin, fmtDur, durHtml, meters, store, ICON, pushLayer, popLayer, gps, startGps, onGps, freshGps,
     leafletReady, makeMap, meMarker, setHeading, endMarker, startMarker, drawSvg, kindLabel, badgeHtml, net: null };
 
   // ---------- Carga de la red ----------
@@ -184,7 +200,7 @@
   let sheetField = null, items = [], token = 0, timer = null;
   function setPick(which, p) {
     const btn = $(which === "from" ? "pick-from" : "pick-to"), span = btn.querySelector("span");
-    if (p) { span.textContent = p.name; span.className = ""; }
+    if (p) { span.textContent = p.name; span.className = ""; if (p.gps && p.near) { const em = document.createElement("em"); em.className = "near"; em.textContent = p.near; span.appendChild(em); } }
     else { span.textContent = which === "from" ? "Tu ubicación, dirección o estación" : "¿A dónde vas?"; span.className = "ph"; }
   }
   function openSheet(which) {
@@ -371,27 +387,58 @@
 
   function note(t, err) { const m = $("msg"); m.hidden = !t; m.className = "note" + (err ? " err" : ""); m.textContent = t || ""; }
 
+  // "Mi ubicación" con una referencia de dónde estás: el paradero o la calle más cercana
+  function gpsPlace(pos) {
+    const p = { name: "Mi ubicación", lat: pos.lat, lng: pos.lng, kind: "GPS", gps: true, t: pos.t };
+    if (P.net) { const n = P.net.near(pos.lat, pos.lng, 500)[0]; if (n) p.near = "Cerca de " + P.net.name[n[0]]; }
+    Geo.reverse(pos.lat, pos.lng).then(r => {
+      const txt = r && (r.name || r.sub);
+      if (!txt) return;
+      p.near = "Cerca de " + txt;
+      for (const w of ["from", "to"]) if ((w === "from" ? origin : dest) === p) setPick(w, p);
+    });
+    return p;
+  }
+
   // GPS como punto de partida o llegada
   function useGps(which) {
     const apply = pos => {
-      const p = { name: "Mi ubicación", lat: pos.lat, lng: pos.lng, kind: "GPS", gps: true };
+      const p = gpsPlace(pos);
       if (!Geo.inBogota(p)) { note("Tu ubicación está fuera de Bogotá. Escribe el punto de partida.", true); return false; }
       setPlace(which, p); note(""); if (origin && dest) run(); return true;
     };
-    if (gps.pos) { apply(gps.pos); return; }
+    if (gps.pos && Date.now() - gps.pos.t < 20000) { apply(gps.pos); return; }
     note("Buscando tu ubicación…");
     startGps();
-    const off = onGps((pos, err) => {
-      off();
-      if (pos) apply(pos);
-      else note(err && err.code === 1 ? "Permiso de ubicación negado. Actívalo en Ajustes > Apps > Transub > Permisos." : "No se pudo leer el GPS. Revisa que la ubicación esté activa.", true);
+    freshGps(20000).then(pos => {
+      if (pos && Date.now() - pos.t < 60000) apply(pos);
+      else note(gps.denied ? "Permiso de ubicación negado. Actívalo en Ajustes > Apps > Transub > Permisos." : "No se pudo leer el GPS. Revisa que la ubicación esté activa.", true);
     });
   }
 
   // ---------- Buscar ----------
+  let gpsToken = 0;
   function run(when) {
     if (!P.net) return;
     if (when !== undefined) setWhen(when);
+    // "Mi ubicación": siempre la de este momento, no la de cuando se eligió
+    const live = [origin, dest].some(p => p && p.gps);
+    if (live && (!gps.pos || Date.now() - gps.pos.t > 20000 || [origin, dest].some(p => p && p.gps && (p.lat !== gps.pos.lat || p.lng !== gps.pos.lng || !p.near)))) {
+      const my = ++gpsToken;
+      note("Actualizando tu ubicación…");
+      $("results").innerHTML = '<div class="loading"><div class="spin"></div>Buscando dónde estás…</div>';
+      startGps();
+      freshGps(20000).then(pos => {
+        if (my !== gpsToken) return;
+        if (!pos) { note("No se pudo leer el GPS. Revisa que la ubicación esté activa.", true); return; }
+        for (const w of ["from", "to"]) { const p = w === "from" ? origin : dest; if (p && p.gps) setPlace(w, gpsPlace(pos)); }
+        run2();
+      });
+      return;
+    }
+    run2();
+  }
+  function run2() {
     if (planWhen && planWhen < new Date(Date.now() - 5 * 60000)) setWhen(null);   // una hora programada que ya pasó
     if (!origin || !dest) { note("Elige el origen y el destino.", true); return; }
     if (Router.hav(origin.lat, origin.lng, dest.lat, dest.lng) < 120) { note("El origen y el destino están en el mismo punto.", true); return; }

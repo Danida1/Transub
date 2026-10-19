@@ -32,10 +32,14 @@ import android.widget.FrameLayout;
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.webkit.WebViewAssetLoader;
+import androidx.core.content.FileProvider;
 
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -52,6 +56,9 @@ public class MainActivity extends Activity {
     private String pendingShared;   // texto o enlace compartido desde Google Maps
     private TextToSpeech tts;       // voz para los avisos del modo viaje
     private boolean ttsReady;
+    private File pendingApk;        // actualización descargada esperando el permiso de instalar
+    private volatile boolean downloading;
+    private String downloadedUrl;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -133,6 +140,26 @@ public class MainActivity extends Activity {
             @JavascriptInterface
             public boolean tripRunning() {
                 return TripService.running;
+            }
+
+            // ---------- Actualizaciones desde la app ----------
+            @JavascriptInterface
+            public int appBuild() {
+                try {
+                    android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+                    return Build.VERSION.SDK_INT >= 28 ? (int) pi.getLongVersionCode() : pi.versionCode;
+                }
+                catch (Exception e) { return 0; }
+            }
+
+            @JavascriptInterface
+            public void installUpdate(String url) {
+                if (downloading) return;
+                if (url == null || !url.startsWith("https://github.com/Danida1/Transub/releases/")) return;
+                File ready = new File(new File(getCacheDir(), "update"), "Transub.apk");
+                if (url.equals(downloadedUrl) && ready.exists()) { runOnUiThread(() -> installApk(ready)); return; }   // ya descargada
+                downloading = true;
+                new Thread(() -> downloadAndInstall(url)).start();
             }
 
             @JavascriptInterface
@@ -386,9 +413,73 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
+    private void updJs(String js) {
+        runOnUiThread(() -> { if (web != null) web.evaluateJavascript(js, null); });
+    }
+
+    private void downloadAndInstall(String url) {
+        File dir = new File(getCacheDir(), "update");
+        File apk = new File(dir, "Transub.apk");
+        try {
+            dir.mkdirs();
+            HttpURLConnection c = null;
+            String u = url;
+            for (int hop = 0; hop < 6; hop++) {   // GitHub redirige al servidor de descargas
+                c = (HttpURLConnection) new URL(u).openConnection();
+                c.setInstanceFollowRedirects(false);
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(30000);
+                c.setRequestProperty("User-Agent", "Transub");
+                int code = c.getResponseCode();
+                if (code >= 300 && code < 400 && c.getHeaderField("Location") != null) { u = new URL(new URL(u), c.getHeaderField("Location")).toString(); c.disconnect(); continue; }
+                if (code != 200) throw new Exception("HTTP " + code);
+                break;
+            }
+            long total = c.getContentLengthLong(), got = 0;
+            int last = -1;
+            try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(apk)) {
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    out.write(buf, 0, n);
+                    got += n;
+                    int pct = total > 0 ? (int) (got * 100 / total) : -1;
+                    if (pct != last) { last = pct; updJs("window.__updProgress&&window.__updProgress(" + pct + ")"); }
+                }
+            }
+            c.disconnect();
+            downloadedUrl = url;
+            updJs("window.__updProgress&&window.__updProgress(100)");
+            runOnUiThread(() -> installApk(apk));
+        } catch (Exception e) {
+            updJs("window.__updError&&window.__updError(" + JSONObject.quote(String.valueOf(e.getMessage())) + ")");
+        } finally {
+            downloading = false;
+        }
+    }
+
+    private void installApk(File apk) {
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            // Android pide permitir que Transub instale actualizaciones (una sola vez)
+            pendingApk = apk;
+            updJs("window.__updNeedsPermission&&window.__updNeedsPermission()");
+            try {
+                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+            return;
+        }
+        pendingApk = null;
+        Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".files", apk);
+        Intent i = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        try { startActivity(i); } catch (Exception e) { updJs("window.__updError&&window.__updError('No se pudo abrir el instalador')"); }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        // Volviendo de dar el permiso de instalar: seguir con la actualización
+        if (pendingApk != null && pendingApk.exists() && Build.VERSION.SDK_INT >= 26 && getPackageManager().canRequestPackageInstalls()) installApk(pendingApk);
         // Al volver del inicio de sesión de X, Novedades muestra las publicaciones
         if (web != null) web.evaluateJavascript("window.__xLoginDone&&window.__xLoginDone()", null);
     }

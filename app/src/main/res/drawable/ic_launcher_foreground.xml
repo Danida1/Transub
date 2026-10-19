@@ -2,9 +2,9 @@
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
     <!-- Transub: una T cuya barra es una flecha que avanza -->
-    <group android:scaleX="0.86" android:scaleY="0.86" android:pivotX="54" android:pivotY="54" android:translateX="-2">
-        <path android:fillColor="#FFFFFF" android:pathData="M28,34 H66 V26 L84,40 L66,54 V46 H28 A6,6 0 0 1 28,34 Z" />
-        <path android:fillColor="#FFFFFF" android:pathData="M40,46 A6,6 0 0 1 52,46 V74 A6,6 0 0 1 40,74 Z" />
-        <path android:fillColor="#2E4A62" android:pathData="M42,80 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+    <group android:scaleX="0.86" android:scaleY="0.86" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FFFFFF" android:pathData="M28,30 H66 V22 L86,36 L66,50 V42 H28 A6,6 0 0 1 28,30 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M48,42 A6,6 0 0 1 60,42 V76 A6,6 0 0 1 48,76 Z" />
+        <path android:fillColor="#2E4A62" android:pathData="M50,82 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
     </group>
 </vector>

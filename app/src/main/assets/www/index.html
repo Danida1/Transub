@@ -9,7 +9,7 @@
 <style>
 :root{
   --bg:#EEF0EE; --surface:#FFFFFF; --sunk:#E3E6E4; --ink:#16191A; --muted:#5D6563; --line:#D2D7D4;
-  --accent:#2B7F77; --accent-ink:#FFFFFF; --brand:#3A9E93; --dest:#D9694F; --ok:#1E7A4C; --ok-bg:#E1F2E8; --off:#7A6F64; --off-bg:#ECE8E3; --walk:#8A918F;
+  --accent:#2B7F77; --accent-ink:#FFFFFF; --brand:#3A9E93; --wm:#C98A35; --dest:#D9694F; --ok:#1E7A4C; --ok-bg:#E1F2E8; --off:#7A6F64; --off-bg:#ECE8E3; --walk:#8A918F;
   --f-display:"Archivo Narrow","Arial Narrow",Arial,sans-serif;
   --f-body:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,"Roboto Mono",monospace;
@@ -17,7 +17,7 @@
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#111415; --surface:#1A1E1F; --sunk:#252A2B; --ink:#EDF0EF; --muted:#9AA3A1; --line:#2E3536;
-  --accent:#6CC7BA; --accent-ink:#0D2B28; --brand:#6CC7BA; --dest:#F08A70; --ok:#49B97F; --ok-bg:#16291F; --off:#A89C90; --off-bg:#2A2622; --walk:#7C8583; color-scheme:dark}
+  --accent:#6CC7BA; --accent-ink:#0D2B28; --brand:#6CC7BA; --wm:#F2B66B; --dest:#F08A70; --ok:#49B97F; --ok-bg:#16291F; --off:#A89C90; --off-bg:#2A2622; --walk:#7C8583; color-scheme:dark}
   .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -35,7 +35,7 @@ button{cursor:pointer}
 .brand{display:flex;align-items:center;gap:10px}
 .mark{width:40px;height:40px;border-radius:11px;flex:none}
 .brand h1{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;line-height:1;letter-spacing:.01em}
-.brand h1 span{color:var(--brand)}
+.brand h1 span{color:var(--wm)}
 .brand small{display:block;color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
 .clock{font-family:var(--f-num);font-size:13px;color:var(--muted);text-align:right}
 .clock b{display:block;font-family:var(--f-body);font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
@@ -385,13 +385,50 @@ body.has-trip .obody{padding-bottom:96px!important}
 .rwarn b{display:block;font-size:14px;color:#B5543A}.rwarn small{display:block;font-size:13px;color:var(--ink)}
 .navrep{background:var(--surface)!important;color:var(--ink)!important;margin-right:8px}
 .toast{position:fixed;left:16px;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:2400;background:#16191A;color:#fff;border-radius:12px;padding:12px 14px;font-size:14.5px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+
+/* Animación de inicio */
+.splash{position:fixed;inset:0;z-index:5000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;animation:sp-out .45s ease-in 2.05s forwards}
+.splash.skip{animation:sp-out .25s ease-in forwards}
+.sp-row{display:flex;align-items:center}
+.sp-tile{width:96px;height:96px;flex:none;filter:drop-shadow(0 10px 22px rgba(201,138,53,.35));animation:sp-pop .55s cubic-bezier(.34,1.56,.64,1) both}
+.sp-tile *{transform-box:fill-box}
+.sp-arrow{transform-origin:left center;animation:sp-arrow .5s cubic-bezier(.22,1,.36,1) .3s both}
+.sp-stem{transform-origin:center top;animation:sp-stem .4s cubic-bezier(.22,1,.36,1) .62s both}
+.sp-dot{transform-origin:center;animation:sp-dot .45s cubic-bezier(.34,1.56,.64,1) .92s both}
+.sp-word{overflow:hidden;max-width:0;animation:sp-word .6s cubic-bezier(.22,1,.36,1) 1.12s forwards}
+.sp-word b{display:block;padding-left:16px;font-family:var(--f-display);font-weight:700;font-size:46px;line-height:1;letter-spacing:.01em;white-space:nowrap;transform:translateX(-24px);opacity:0;animation:sp-text .6s cubic-bezier(.22,1,.36,1) 1.18s forwards}
+.sp-word span{color:var(--wm)}
+.sp-tag{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);opacity:0;animation:sp-fade .4s ease 1.55s forwards}
+@keyframes sp-pop{from{transform:scale(.4) rotate(-8deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes sp-arrow{from{transform:translateX(-40%) scaleX(.2);opacity:0}to{transform:none;opacity:1}}
+@keyframes sp-stem{from{transform:scaleY(0)}to{transform:none}}
+@keyframes sp-dot{from{transform:scale(0)}to{transform:none}}
+@keyframes sp-word{to{max-width:260px}}
+@keyframes sp-text{to{transform:none;opacity:1}}
+@keyframes sp-fade{to{opacity:1}}
+@keyframes sp-out{to{opacity:0;transform:scale(1.04);visibility:hidden}}
+@media (prefers-reduced-motion:reduce){.splash,.splash *{animation-duration:.01s!important;animation-delay:0s!important}.splash{animation:sp-out .3s ease 1s forwards!important}}
+.updrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:14.5px;font-weight:600}
+.updrow .chipbtn{color:var(--ink)}
 </style>
 </head>
 <body>
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="sp-row">
+    <svg class="sp-tile" viewBox="0 0 108 108">
+      <rect class="sp-bg" width="108" height="108" rx="26" fill="#F2B66B"/>
+      <path class="sp-arrow" fill="#fff" d="M28,34 H66 V26 L84,40 L66,54 V46 H28 A6,6 0 0 1 28,34 Z"/>
+      <rect class="sp-stem" x="40" y="40" width="12" height="40" rx="6" fill="#fff"/>
+      <circle class="sp-dot" cx="46" cy="80" r="4.5" fill="#2E4A62"/>
+    </svg>
+    <div class="sp-word"><b>Trans<span>ub</span></b></div>
+  </div>
+  <small class="sp-tag">TransMilenio y SITP · Bogotá</small>
+</div>
 <div class="app">
   <header class="top">
     <div class="brand">
-      <svg class="mark" viewBox="20 18 68 68" aria-hidden="true"><rect x="20" y="18" width="68" height="68" fill="#3A9E93"/><path fill="#fff" d="M35.5,30.5 H72.5 A4.5,4.5 0 0 1 72.5,39.5 H35.5 A4.5,4.5 0 0 1 35.5,30.5 Z M49.5,35 H58.5 V55 H49.5 Z M54,79 C48.5,71.5 43,66 43,59.5 A11,11 0 1 1 65,59.5 C65,66 59.5,71.5 54,79 Z"/><circle cx="54" cy="59.5" r="4.4" fill="#3A9E93"/><circle cx="35.5" cy="35" r="3.2" fill="#F5C36B"/><circle cx="72.5" cy="35" r="3.2" fill="#F5C36B"/></svg>
+      <svg class="mark" viewBox="0 0 108 108" aria-hidden="true"><rect width="108" height="108" fill="#F2B66B"/><path fill="#fff" d="M28,34 H66 V26 L84,40 L66,54 V46 H28 A6,6 0 0 1 28,34 Z"/><rect x="40" y="40" width="12" height="40" rx="6" fill="#fff"/><circle cx="46" cy="80" r="4" fill="#2E4A62"/></svg>
       <div><h1>Trans<span>ub</span></h1><small>TransMilenio y SITP · Bogotá</small></div>
     </div>
     <div class="clock"><b id="daytype"></b><span id="clock"></span></div>
@@ -482,6 +519,7 @@ body.has-trip .obody{padding-bottom:96px!important}
       </a>
     </div>
     <div class="sec-h"><h2>Datos de la app</h2></div>
+    <div class="updrow"><span id="upd-state">Versión de la app</span><button type="button" class="chipbtn" id="upd-check">Buscar actualizaciones</button></div>
     <dl class="info" id="datainfo"><dt>Estado</dt><dd>Cargando…</dd></dl>
     <p class="fine">Rutas, paraderos, horarios y frecuencias vienen del GTFS oficial de Bogotá (SIMUR). Los tiempos se estiman con la programación oficial; no incluyen la posición de los buses en vivo.</p>
   </section>
@@ -641,6 +679,13 @@ body.has-trip .obody{padding-bottom:96px!important}
 </nav>
 
 <script src="vendor/leaflet.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';s.onload=function(){window.dispatchEvent(new Event('leaflet'))};document.head.appendChild(s)"></script>
+<script>
+(function(){var sp=document.getElementById("splash");if(!sp)return;
+  var done=function(){if(sp&&sp.parentNode){sp.parentNode.removeChild(sp);sp=null;}};
+  sp.addEventListener("click",function(){sp.classList.add("skip");setTimeout(done,300);});
+  sp.addEventListener("animationend",function(e){if(e.animationName==="sp-out")done();});
+  setTimeout(done,3200);})();
+</script>
 <script src="geo.js"></script>
 <script src="router.js"></script>
 <script src="app.js"></script>

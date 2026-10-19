@@ -336,7 +336,7 @@ public class MainActivity extends Activity {
                         Uri u = Uri.parse(url);
                         String h = u.getHost();
                         if (!"https".equals(u.getScheme()) || h == null
-                                || !(h.equals("routing.openstreetmap.de") || h.equals("photon.komoot.io") || h.equals("nominatim.openstreetmap.org") || h.equals("news.google.com") || h.equals("ntfy.sh"))) {
+                                || !(h.equals("routing.openstreetmap.de") || h.equals("photon.komoot.io") || h.equals("nominatim.openstreetmap.org") || h.equals("news.google.com") || h.equals("ntfy.sh") || h.equals("api.github.com"))) {
                             throw new Exception("servidor no permitido");
                         }
                         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();

@@ -1,11 +1,10 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Transub: una T hecha con una línea de ruta y sus paradas, que termina en un pin de ubicación -->
-    <path android:fillColor="#FFFFFF" android:pathData="M35.5,30.5 H72.5 A4.5,4.5 0 0 1 72.5,39.5 H35.5 A4.5,4.5 0 0 1 35.5,30.5 Z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M49.5,35 H58.5 V55 H49.5 Z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M54,79 C48.5,71.5 43,66 43,59.5 A11,11 0 1 1 65,59.5 C65,66 59.5,71.5 54,79 Z" />
-    <path android:fillColor="#3A9E93" android:pathData="M49.6,59.5 a4.4,4.4 0 1,0 8.8,0 a4.4,4.4 0 1,0 -8.8,0 Z" />
-    <path android:fillColor="#F5C36B" android:pathData="M32.3,35 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z" />
-    <path android:fillColor="#F5C36B" android:pathData="M69.3,35 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z" />
+    <!-- Transub: una T cuya barra es una flecha que avanza -->
+    <group android:scaleX="0.86" android:scaleY="0.86" android:pivotX="54" android:pivotY="54" android:translateX="-2">
+        <path android:fillColor="#FFFFFF" android:pathData="M28,34 H66 V26 L84,40 L66,54 V46 H28 A6,6 0 0 1 28,34 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M40,46 A6,6 0 0 1 52,46 V74 A6,6 0 0 1 40,74 Z" />
+        <path android:fillColor="#2E4A62" android:pathData="M42,80 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+    </group>
 </vector>
